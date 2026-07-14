@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- Apple Web App support for iPhone -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LegalDoc">
+    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg">
+    <title>LegalDoc Auditor - Hệ thống Nghiên cứu & Đối soát Pháp luật</title>
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Third-party Libraries from CDN -->
+    <!-- Mammoth.js for docx parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- jsdiff for document diffing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Identity Services (GIS) for OAuth 2.0 -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- QRCode.js for generating LAN QR codes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Mobile-only backdrop: closes the nav drawer / outline / notes overlay when tapped -->
+        <div class="mobile-sidebar-backdrop" id="mobile-sidebar-backdrop"></div>
+
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass-panel">
+            <div>
+                <div class="brand">
+                    <div class="brand-icon">LD</div>
+                    <span class="brand-name">LegalDoc Auditor</span>
+                </div>
+                <nav>
+                    <ul class="nav-list">
+                        <li class="nav-item active" data-target="dashboard-page">
+                            <a href="#dashboard"><i data-lucide="layout-dashboard"></i>Tổng quan</a>
+                        </li>
+                        <li class="nav-item" data-target="library-page">
+                            <a href="#library"><i data-lucide="book-open"></i>Thư viện văn bản</a>
+                        </li>
+                        <li class="nav-item" data-target="congvan-page">
+                            <a href="#congvan"><i data-lucide="mail-open"></i>Công văn</a>
+                        </li>
+                        <li class="nav-item" data-target="khac-page">
+                            <a href="#khac"><i data-lucide="folder-open"></i>Tài liệu khác</a>
+                        </li>
+                        <li class="nav-item" data-target="viewer-page">
+                            <a href="#viewer"><i data-lucide="file-text"></i>Nghiên cứu văn bản</a>
+                        </li>
+                        <li class="nav-item" data-target="compare-page">
+                            <a href="#compare"><i data-lucide="git-compare"></i>Đối soát so sánh</a>
+                        </li>
+                        <li class="nav-item" data-target="relations-page">
+                            <a href="#relations"><i data-lucide="git-branch"></i>Sơ đồ quan hệ</a>
+                        </li>
+                        <li class="nav-item" data-target="timeline-page">
+                            <a href="#timeline"><i data-lucide="calendar-range"></i>Timeline hiệu lực</a>
+                        </li>
+                        <li class="nav-item" data-target="upload-page">
+                            <a href="#upload"><i data-lucide="upload-cloud"></i>Tải lên tài liệu</a>
+                        </li>
+                        <li class="nav-item" data-target="fields-page">
+                            <a href="#fields"><i data-lucide="settings"></i>Cấu hình lĩnh vực</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="sidebar-footer">
+                <button class="theme-toggle-btn" id="theme-toggle">
+                    <i data-lucide="sun" id="theme-icon"></i>
+                    <span id="theme-text">Giao diện Sáng</span>
+                </button>
+                <div class="user-profile">
+                    <div class="user-avatar">KT</div>
+                    <div class="user-info">
+                        <span class="user-name">Kiểm toán viên</span>
+                        <span class="user-role">Đang hoạt động</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="main-content">
+            <!-- Header bar -->
+            <header class="header">
+                <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+                    <button class="mobile-menu-btn" id="mobile-menu-btn" title="Menu"><i data-lucide="menu"></i></button>
+                    <h2 style="font-weight: 600; font-size: 1.25rem;" id="header-page-title">Tổng quan hệ thống</h2>
+                </div>
+                <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                    <div class="search-bar">
+                        <i data-lucide="search" style="color: var(--text-muted); width: 18px;"></i>
+                        <input type="text" id="global-search" placeholder="Tìm kiếm nhanh số hiệu, từ khóa...">
+                    </div>
+                    
+                    <!-- Google Drive Sync controls -->
+                    <div class="gdrive-sync-container" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button class="action-btn" id="gdrive-login-btn" title="Kết nối Google Drive" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.35rem; background: var(--glass-bg); transition: all 0.2s;">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" style="width: 14px; height: 14px;" alt="Drive">
+                            <span>Đồng bộ Cloud</span>
+                        </button>
+                        <div id="gdrive-status-container" style="display: none; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--text-muted); background: var(--glass-bg); padding: 0.3rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <span class="status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span>
+                            <span id="gdrive-sync-status">Đang đồng bộ</span>
+                            <button class="action-btn" id="gdrive-sync-now-btn" title="Đồng bộ ngay lập tức" style="padding: 2px; width: 22px; height: 22px; margin-left: 0.25rem;"><i data-lucide="refresh-cw" style="width: 12px;"></i></button>
+                            <button class="action-btn" id="gdrive-logout-btn" title="Đăng xuất Google Drive" style="padding: 2px; width: 22px; height: 22px;"><i data-lucide="log-out" style="width: 12px; color: var(--danger-color);"></i></button>
+                        </div>
+                        <button class="action-btn" id="gdrive-settings-btn" title="Cấu hình Google Drive Client ID" style="padding: 0.4rem; width: 34px; height: 34px;"><i data-lucide="settings" style="width: 16px;"></i></button>
+                    </div>
+
+                    <!-- QR Code Trigger -->
+                    <button class="action-btn" id="qr-trigger-btn" title="Quét QR mở trên Điện thoại" style="padding: 0.4rem; width: 34px; height: 34px; border-radius: 8px;"><i data-lucide="qr-code" style="width: 18px;"></i></button>
+                </div>
+            </header>
+
+            <!-- 1. Dashboard Page -->
+            <section id="dashboard-page" class="page-container active">
+                <!-- Sao lưu / Phục hồi dữ liệu ra file .json (chống mất dữ liệu do trình duyệt xóa storage) -->
+                <div class="glass-card backup-card">
+                    <div class="backup-card-info">
+                        <div class="stat-icon green" style="flex-shrink:0;"><i data-lucide="shield-check"></i></div>
+                        <div>
+                            <h4 style="margin:0; font-size:0.95rem;">Sao lưu &amp; Phục hồi dữ liệu</h4>
+                            <p style="margin:0.15rem 0 0; font-size:0.8rem; color:var(--text-muted);">Xuất toàn bộ văn bản, ghi chú, quan hệ ra 1 file để cất giữ an toàn (nên làm định kỳ). Phục hồi khi đổi trình duyệt/máy hoặc lỡ mất dữ liệu.</p>
+                        </div>
+                    </div>
+                    <div class="backup-card-actions">
+                        <button class="btn-primary" id="backup-export-btn" style="width:auto; font-size:0.8rem; padding:0.5rem 0.9rem;"><i data-lucide="download" style="width:16px;"></i> Xuất sao lưu (.json)</button>
+                        <button class="action-btn" id="backup-import-btn" style="font-size:0.8rem; padding:0.5rem 0.9rem;"><i data-lucide="upload" style="width:16px;"></i> Nhập phục hồi</button>
+                        <button class="action-btn" id="clear-database-btn" style="font-size:0.8rem; padding:0.5rem 0.9rem; border-color: #dc3545; color: #dc3545; background: transparent;"><i data-lucide="trash-2" style="width:16px;"></i> Xóa sạch dữ liệu</button>
+                        <input type="file" id="backup-import-input" accept="application/json,.json" style="display:none;">
+                    </div>
+                </div>
+                <div class="stats-row">
+                    <div class="glass-card stat-card">
+                        <div class="stat-icon blue"><i data-lucide="file-archive"></i></div>
+                        <div class="stat-info">
+                            <h4>Tổng số văn bản</h4>
+                            <p id="stat-total-docs">0</p>
+                        </div>
+                    </div>
+                    <div class="glass-card stat-card">
+                        <div class="stat-icon green"><i data-lucide="scale"></i></div>
+                        <div class="stat-info">
+                            <h4>Luật, Nghị định, Thông tư</h4>
+                            <p id="stat-main-docs">0</p>
+                        </div>
+                    </div>
+                    <div class="glass-card stat-card">
+                        <div class="stat-icon purple"><i data-lucide="mail-open"></i></div>
+                        <div class="stat-info">
+                            <h4>Công văn & Quyết định</h4>
+                            <p id="stat-official-docs">0</p>
+                        </div>
+                    </div>
+                    <div class="glass-card stat-card">
+                        <div class="stat-icon amber"><i data-lucide="pen-tool"></i></div>
+                        <div class="stat-info">
+                            <h4>Tổng số ghi chú</h4>
+                            <p id="stat-total-notes">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Left: Recent Documents Tabs -->
+                    <div class="glass-card">
+                        <div class="dashboard-tabs" style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem; overflow-x: auto;">
+                            <button class="dashboard-tab active" data-tab="recently-viewed">
+                                <i data-lucide="clock" style="width: 14px;"></i> Đã xem gần đây
+                            </button>
+                            <button class="dashboard-tab" data-tab="recently-added">
+                                <i data-lucide="file-plus" style="width: 14px;"></i> Vừa thêm gần đây
+                            </button>
+                            <button class="dashboard-tab" data-tab="recently-issued">
+                                <i data-lucide="calendar" style="width: 14px;"></i> Ban hành gần đây
+                            </button>
+                            <button class="dashboard-tab" data-tab="recently-expired">
+                                <i data-lucide="alert-triangle" style="width: 14px;"></i> Hết hiệu lực gần đây
+                            </button>
+                        </div>
+                        <div class="doc-table-container">
+                            <table class="doc-table">
+                                <thead>
+                                    <tr>
+                                        <th>Số hiệu</th>
+                                        <th>Tên văn bản</th>
+                                        <th>Lĩnh vực</th>
+                                        <th>Loại</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboard-recent-docs">
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: var(--text-muted);">Chưa có văn bản nào trong hệ thống</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Right: Notes Activity -->
+                    <div class="glass-card">
+                        <h3 class="section-title"><i data-lucide="bookmark" style="color: var(--warning-color);"></i>Ghi chú mới nhất</h3>
+                        <div class="notes-list" id="dashboard-recent-notes" style="max-height: 400px; overflow-y: auto; padding: 0;">
+                            <div class="empty-state" style="padding: 2rem 0;">
+                                <i data-lucide="sticky-note" class="empty-state-icon" style="width: 32px;"></i>
+                                <p style="font-size: 0.85rem;">Chưa có ghi chú nào được tạo</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Library Page -->
+            <section id="library-page" class="page-container">
+                <div class="lib-field-tabs" id="lib-field-tabs">
+                    <!-- Populated from FIELD_HIERARCHY in app.js -->
+                </div>
+                <div class="library-filters">
+                    <div class="filter-group">
+                        <label for="filter-field">Lĩnh vực</label>
+                        <select id="filter-field" class="filter-select">
+                            <!-- Populated from FIELD_HIERARCHY in app.js -->
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-type">Loại văn bản</label>
+                        <select id="filter-type" class="filter-select">
+                            <option value="all">Tất cả loại</option>
+                            <option value="Luật">Luật</option>
+                            <option value="Nghị định">Nghị định</option>
+                            <option value="Thông tư">Thông tư</option>
+                            <option value="Công văn">Công văn</option>
+                            <option value="Quyết định">Quyết định</option>
+                            <option value="Khác">Khác</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-search">Tìm kiếm</label>
+                        <input type="text" id="filter-search" class="filter-select" placeholder="Số hiệu hoặc từ khóa..." style="min-width: 250px;">
+                    </div>
+                </div>
+
+                <div class="doc-table-container">
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Số hiệu</th>
+                                <th>Tên văn bản</th>
+                                <th>Lĩnh vực</th>
+                                <th>Loại</th>
+                                <th>Ngày ban hành</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="library-docs-list">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Đang tải danh sách văn bản...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 2b. Công văn Page -->
+            <section id="congvan-page" class="page-container">
+                <div class="library-filters">
+                    <div class="filter-group">
+                        <label for="congvan-filter-search">Tìm kiếm</label>
+                        <input type="text" id="congvan-filter-search" class="filter-select" placeholder="Số hiệu hoặc từ khóa..." style="min-width: 250px;">
+                    </div>
+                    <button class="btn-primary" id="congvan-add-btn" style="width: auto; padding: 0.6rem 1.25rem; margin-left: auto;">
+                        <i data-lucide="upload-cloud" style="width: 16px;"></i> Tải lên công văn
+                    </button>
+                </div>
+
+                <div class="doc-table-container">
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Số hiệu</th>
+                                <th>Tên văn bản</th>
+                                <th>Lĩnh vực</th>
+                                <th>Cơ quan ban hành</th>
+                                <th>Ngày ban hành</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="congvan-docs-list">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Đang tải danh sách công văn...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 2c. Tài liệu khác Page -->
+            <section id="khac-page" class="page-container">
+                <div class="library-filters">
+                    <div class="filter-group">
+                        <label for="khac-filter-search">Tìm kiếm</label>
+                        <input type="text" id="khac-filter-search" class="filter-select" placeholder="Số hiệu hoặc từ khóa..." style="min-width: 250px;">
+                    </div>
+                    <button class="btn-primary" id="khac-add-btn" style="width: auto; padding: 0.6rem 1.25rem; margin-left: auto;">
+                        <i data-lucide="upload-cloud" style="width: 16px;"></i> Tải lên tài liệu
+                    </button>
+                </div>
+
+                <div class="doc-table-container">
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Số hiệu</th>
+                                <th>Tên văn bản</th>
+                                <th>Lĩnh vực</th>
+                                <th>Cơ quan ban hành</th>
+                                <th>Ngày ban hành</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="khac-docs-list">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Đang tải danh sách tài liệu...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 3. Viewer Page (Split screen) -->
+            <section id="viewer-page" class="page-container" style="padding: 0;">
+                <div class="viewer-layout">
+                    <!-- Left: Table of Contents (Outline) -->
+                    <aside class="outline-sidebar" id="outline-sidebar">
+                        <div class="outline-header">
+                            <span>Mục lục điều khoản</span>
+                            <i data-lucide="list-tree" style="width: 18px; color: var(--text-muted);"></i>
+                        </div>
+                        <ul class="outline-tree" id="viewer-outline">
+                            <li style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center;">Vui lòng mở một văn bản</li>
+                        </ul>
+                    </aside>
+                    <div class="resize-handle" id="outline-resize-handle"></div>
+
+                    <!-- Middle: Document Content Area -->
+                    <div class="document-view-container">
+                        <div class="viewer-tabs" id="viewer-tabs"></div>
+                        <div class="document-toolbar">
+                            <div class="toolbar-group">
+                                <button class="action-btn" id="toggle-outline-btn" title="Ẩn/hiện mục lục"><i data-lucide="panel-left" style="width: 18px;"></i></button>
+                                <span id="viewer-doc-title" style="font-weight: 600; font-size: 0.95rem; max-width: 450px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Chưa có văn bản nào đang mở</span>
+                                <span class="badge badge-blue" id="viewer-doc-badge" style="display: none;">Mới</span>
+                                <a id="viewer-source-link" href="#" target="_blank" rel="noopener noreferrer" class="badge badge-green" style="display: none; align-items: center; gap: 0.3rem; text-decoration: none; cursor: pointer;" title="Mở văn bản gốc trên trang nguồn">
+                                    <i data-lucide="external-link" style="width: 12px;"></i> Xem online
+                                </a>
+                            </div>
+                            <div class="toolbar-group" style="gap: 0.5rem;">
+                                <div class="search-bar" id="viewer-search-bar" style="width: 280px; height: 32px; padding: 0 0.4rem; gap: 0.3rem;">
+                                    <i data-lucide="search" style="width: 14px; color: var(--text-muted); flex-shrink: 0;"></i>
+                                    <input type="text" id="viewer-search-input" placeholder="Tìm trong văn bản..." style="font-size: 0.8rem; flex: 1; min-width: 0;">
+                                    <span id="search-counter" style="font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; display: none;">0/0</span>
+                                    <div style="display: flex; gap: 1px; flex-shrink: 0;">
+                                        <button class="action-btn" id="search-prev-btn" title="Kết quả trước (Shift+Enter)" style="padding: 2px; width: 22px; height: 22px;"><i data-lucide="chevron-up" style="width: 14px;"></i></button>
+                                        <button class="action-btn" id="search-next-btn" title="Kết quả sau (Enter)" style="padding: 2px; width: 22px; height: 22px;"><i data-lucide="chevron-down" style="width: 14px;"></i></button>
+                                    </div>
+                                    <button class="action-btn" id="search-clear-btn" title="Xóa tìm kiếm (Esc)" style="padding: 2px; width: 22px; height: 22px; display: none;"><i data-lucide="x" style="width: 13px;"></i></button>
+                                </div>
+                                <button class="action-btn" id="viewer-zoom-in" title="Phóng to chữ"><i data-lucide="zoom-in" style="width: 18px;"></i></button>
+                                <button class="action-btn" id="viewer-zoom-out" title="Thu nhỏ chữ"><i data-lucide="zoom-out" style="width: 18px;"></i></button>
+                                <button class="btn-primary" id="viewer-split-btn" style="width: auto; font-size: 0.8rem; padding: 0.4rem 0.8rem; height: 32px; background: var(--accent-color);"><i data-lucide="columns-2" style="width: 16px;"></i> Đọc song song</button>
+                                <button class="action-btn" id="open-snippet-compare-btn" title="So sánh đoạn văn bản (dán đoạn cũ/mới để đối chiếu)"><i data-lucide="diff" style="width: 18px;"></i></button>
+                                <button class="action-btn" id="toggle-notes-btn" title="Ẩn/hiện ghi chú"><i data-lucide="panel-right" style="width: 18px;"></i></button>
+                            </div>
+                        </div>
+                        <div class="viewer-expired-banner" id="viewer-expired-banner" style="display: none;">
+                            <i data-lucide="alert-triangle" style="width: 16px; flex-shrink: 0;"></i>
+                            <span id="viewer-expired-banner-text"></span>
+                        </div>
+                        <div class="document-scroller" id="viewer-scroller-layout" style="display: flex; gap: 1.5rem; overflow: hidden; padding: 0 1.5rem; flex: 1; min-height: 0;">
+                            <!-- Column 1 (Main Document Scroll View) -->
+                            <div class="viewer-column" id="viewer-column-main" style="flex: 1; height: 100%; overflow-y: auto; display: flex; justify-content: center; padding: 1.5rem 0;">
+                                <div class="a4-paper" id="viewer-paper-content" style="width: 100%; max-width: 800px; height: fit-content;">
+                                    <div class="empty-state">
+                                        <i data-lucide="file" class="empty-state-icon"></i>
+                                        <h3>Chưa có tài liệu nào đang mở</h3>
+                                        <p>Vui lòng vào Thư viện chọn văn bản hoặc tải lên file mới.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Column 2 (Split Document Scroll View) -->
+                            <div class="viewer-column" id="viewer-column-split" style="flex: 1; height: 100%; display: none; flex-direction: column; overflow: hidden; padding: 1.5rem 0;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; flex-shrink: 0;">
+                                    <div style="position: relative; min-width: 250px;">
+                                        <input type="text" id="viewer-split-search-input" class="filter-select" style="width: 100%; font-size: 0.75rem; height: 30px;" placeholder="Tìm và chọn văn bản thứ hai..." autocomplete="off">
+                                        <div class="doc-search-dropdown" id="viewer-split-search-dropdown" style="display: none;"></div>
+                                    </div>
+                                    <button class="action-btn" id="close-split-pane-btn" title="Đóng cửa sổ phụ"><i data-lucide="x" style="width: 16px; color: var(--danger-color);"></i></button>
+                                </div>
+                                <div style="flex-grow: 1; overflow-y: auto; display: flex; justify-content: center; width: 100%;">
+                                    <div class="a4-paper" id="viewer-paper-content-split" style="width: 100%; max-width: 800px; height: fit-content;">
+                                        <div id="viewer-paper-content-split-body" style="flex-grow: 1;">
+                                            <div class="empty-state" style="padding: 2rem 0;">
+                                                <i data-lucide="book-open" class="empty-state-icon" style="width: 32px;"></i>
+                                                <p style="font-size: 0.85rem; color: var(--text-muted);">Chọn văn bản thứ hai từ danh sách phía trên để đọc song song.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Notes Sidebar -->
+                    <div class="resize-handle" id="notes-resize-handle"></div>
+                    <aside class="notes-sidebar" id="notes-sidebar">
+                        <div class="notes-header">
+                            <span>Ghi chú của bạn</span>
+                            <i data-lucide="pencil-line" style="width: 18px; color: var(--text-muted);"></i>
+                        </div>
+                        <!-- Văn bản có quan hệ với văn bản đang xem (để tham chiếu nhanh) -->
+                        <div id="viewer-related-docs" class="viewer-related-docs"></div>
+                        <div class="notes-list" id="viewer-notes-list">
+                            <!-- Populated dynamically -->
+                            <div class="empty-state" style="padding: 2rem 0;">
+                                <p style="font-size: 0.85rem;">Bôi đen một câu/đoạn văn bản ở cột giữa và bấm "Thêm ghi chú" để lưu trữ.</p>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </section>
+
+            <!-- 4. Comparison Page (Đối soát) -->
+            <section id="compare-page" class="page-container" style="padding: 0;">
+                <div class="comparison-container">
+                    <div class="comparison-selectors">
+                        <div class="selector-box">
+                            <span style="font-size: 0.85rem; font-weight: 600; white-space: nowrap;">Văn bản A (Gốc):</span>
+                            <select id="compare-select-a" class="filter-select">
+                                <option value="">-- Chọn văn bản thứ nhất --</option>
+                            </select>
+                        </div>
+                        <div class="selector-box">
+                            <span style="font-size: 0.85rem; font-weight: 600; white-space: nowrap;">Văn bản B (Thay thế):</span>
+                            <select id="compare-select-b" class="filter-select">
+                                <option value="">-- Chọn văn bản thứ hai --</option>
+                            </select>
+                        </div>
+                        <button class="btn-primary" id="compare-run-btn" style="width: auto; padding: 0.5rem 1.5rem;"><i data-lucide="git-compare" style="width: 18px;"></i> Đối soát khác biệt</button>
+                    </div>
+
+                    <div class="comparison-views-wrapper">
+                        <!-- Left Pane: Doc A (Gốc) -->
+                        <div class="comparison-pane">
+                            <div class="pane-header" id="compare-pane-a-title">Văn bản A</div>
+                            <div class="pane-body a4-paper-diff" id="compare-pane-a-body" style="background-color: var(--paper-bg); color: var(--paper-text); overflow-y: auto;">
+                                <div class="empty-state">
+                                    <i data-lucide="arrow-left-right" class="empty-state-icon"></i>
+                                    <p>Chọn các văn bản cần so sánh phía trên để hiển thị.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Right Pane: Doc B (Sự thay đổi) -->
+                        <div class="comparison-pane">
+                            <div class="pane-header" id="compare-pane-b-title">Sự thay đổi & Khác biệt</div>
+                            <div class="pane-body a4-paper-diff" id="compare-pane-b-body" style="background-color: var(--paper-bg); color: var(--paper-text); overflow-y: auto;">
+                                <div class="empty-state">
+                                    <i data-lucide="diff" class="empty-state-icon"></i>
+                                    <p>Các từ bị loại bỏ sẽ được gạch đỏ (<del>giảm</del>), các từ thêm mới sẽ được gạch chân xanh (<ins>tăng</ins>).</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. Upload Page -->
+            <section id="upload-page" class="page-container">
+                <div class="glass-card" style="max-width: 900px; margin: 0 auto;">
+                    <h2 class="section-title" style="margin-bottom: 1.5rem;"><i data-lucide="upload-cloud" style="color: var(--primary-color);"></i> Nhập dữ liệu văn bản pháp luật</h2>
+                    
+                    <div class="upload-grid">
+                        <!-- Left side: Drag Drop zone -->
+                        <div>
+                            <div class="upload-zone" id="drop-zone">
+                                <i data-lucide="file-text" class="upload-icon"></i>
+                                <h3>Kéo thả file vào đây</h3>
+                                <p>hoặc <span>nhấp để chọn từ máy tính</span></p>
+                                <p style="font-size: 0.75rem;">Hỗ trợ định dạng Word (.docx) — không bắt buộc nếu đã có file PDF bên dưới</p>
+                                <input type="file" id="file-word-input" accept=".docx" style="display: none;">
+                            </div>
+
+                            <div id="word-file-preview" style="display: none;">
+                                <div class="file-preview-card">
+                                    <i data-lucide="file" style="color: var(--primary-color);"></i>
+                                    <div style="flex-grow: 1;">
+                                        <div id="word-filename" style="font-size: 0.9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+                                        <div id="word-filesize" style="font-size: 0.75rem; color: var(--text-muted);"></div>
+                                    </div>
+                                    <button class="action-btn" id="word-clear-btn"><i data-lucide="trash-2" style="color: var(--danger-color); width: 18px;"></i></button>
+                                </div>
+                            </div>
+
+                            <div id="pdf-upload-container" style="margin-top: 1.5rem;">
+                                <div class="form-group">
+                                    <label>Đính kèm file PDF (Không bắt buộc nếu đã có file Word)</label>
+                                    <div class="upload-zone" id="pdf-drop-zone" style="min-height: 120px; padding: 1.5rem;">
+                                        <i data-lucide="file-digit" style="width: 28px; color: var(--text-muted);"></i>
+                                        <p style="font-size: 0.8rem; margin: 0.3rem 0;">Kéo thả file PDF gốc tại đây</p>
+                                        <input type="file" id="file-pdf-input" accept=".pdf" style="display: none;">
+                                    </div>
+                                    <div id="pdf-file-preview" style="display: none;">
+                                        <div class="file-preview-card" style="margin-top: 0.5rem; padding: 0.5rem 1rem;">
+                                            <i data-lucide="file-text" style="color: var(--danger-color); width: 18px;"></i>
+                                            <div style="flex-grow: 1;">
+                                                <div id="pdf-filename" style="font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;"></div>
+                                            </div>
+                                            <button class="action-btn" id="pdf-clear-btn"><i data-lucide="x" style="width: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 1.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem; margin: 0.25rem 0 1rem;">
+                                    <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+                                    <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700;">HOẶC</span>
+                                    <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="doc-paste-text">Dán nội dung văn bản (thay cho file Word)</label>
+                                    <textarea id="doc-paste-text" class="form-input" rows="6" placeholder="Dán nội dung văn bản pháp luật vào đây — mỗi dòng sẽ được tách thành một đoạn/điều khoản riêng..." style="resize: vertical; font-family: inherit; line-height: 1.5;"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right side: Meta Form -->
+                        <form id="upload-form" onsubmit="return false;">
+                            <div class="form-group">
+                                <label for="doc-title">Tên văn bản *</label>
+                                <input type="text" id="doc-title" class="form-input" required placeholder="Ví dụ: Quy định về kê khai thuế Giá trị gia tăng">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="doc-number">Số hiệu văn bản</label>
+                                    <input type="text" id="doc-number" class="form-input" placeholder="Ví dụ: 80/2021/TT-BTC">
+                                </div>
+                                <div class="form-group">
+                                    <label for="doc-type">Loại văn bản *</label>
+                                    <select id="doc-type" class="filter-select" required>
+                                        <option value="Luật">Luật</option>
+                                        <option value="Nghị định">Nghị định</option>
+                                        <option value="Thông tư">Thông tư</option>
+                                        <option value="Công văn">Công văn</option>
+                                        <option value="Quyết định">Quyết định</option>
+                                        <option value="Khác">Khác</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="doc-source-url">Link nguồn văn bản (thuvienphapluat.vn hoặc nguồn khác, không bắt buộc)</label>
+                                <input type="url" id="doc-source-url" class="form-input" placeholder="https://thuvienphapluat.vn/...">
+                            </div>
+
+                            <div class="form-group" id="doc-authority-group" style="display: none;">
+                                <label for="doc-authority-category">Cơ quan ban hành</label>
+                                <select id="doc-authority-category" class="filter-select">
+                                    <option value="">-- Chọn cơ quan ban hành --</option>
+                                    <option value="Tổng cục Thuế">Tổng cục Thuế</option>
+                                    <option value="Bộ Tài chính">Bộ Tài chính</option>
+                                    <option value="thue_tinh">Thuế tỉnh/thành...</option>
+                                    <option value="ubnd">UBND tỉnh/thành...</option>
+                                    <option value="bo_khac">Bộ khác...</option>
+                                    <option value="co_quan_khac">Cơ quan khác...</option>
+                                </select>
+                                <input type="text" id="doc-authority-province" class="form-input" list="vn-province-list" placeholder="Nhập hoặc tìm tỉnh/thành..." style="margin-top: 0.5rem; display: none;">
+                                <input type="text" id="doc-authority-custom" class="form-input" placeholder="Nhập tên cơ quan..." style="margin-top: 0.5rem; display: none;">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Phân loại Lĩnh vực * (có thể chọn nhiều)</label>
+                                <div class="field-checkbox-box" id="doc-field-box">
+                                    <!-- Populated from FIELD_HIERARCHY in app.js -->
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="doc-issue-date">Ngày ban hành</label>
+                                    <input type="text" id="doc-issue-date" class="form-input" placeholder="Ví dụ: 15/08/2026">
+                                </div>
+                                <div class="form-group">
+                                    <label for="doc-effective-date">Ngày hiệu lực</label>
+                                    <input type="text" id="doc-effective-date" class="form-input" placeholder="Ví dụ: 01/01/2027">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="doc-expiry-date">Ngày hết hiệu lực (để trống nếu còn hiệu lực)</label>
+                                <input type="text" id="doc-expiry-date" class="form-input" placeholder="Ví dụ: 31/12/2030">
+                            </div>
+
+                            <div class="form-group">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                                    <label style="margin-bottom: 0;">Mối quan hệ với văn bản khác (không bắt buộc)</label>
+                                    <button type="button" class="action-btn" id="upload-rel-add-btn" style="width: auto; padding: 0.3rem 0.6rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem;">
+                                        <i data-lucide="plus" style="width: 14px;"></i> Thêm quan hệ
+                                    </button>
+                                </div>
+                                <div id="upload-relations-list" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
+                            </div>
+
+                            <button type="submit" class="btn-primary" id="submit-doc-btn" style="margin-top: 1rem;">
+                                <i data-lucide="check"></i> Lưu văn bản pháp luật
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. Relations Map Page -->
+            <section id="relations-page" class="page-container">
+                <div class="relations-container">
+                    <!-- Toolbar -->
+                    <div class="relations-toolbar">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <button class="btn-primary" id="rel-add-btn" style="width: auto; font-size: 0.8rem; padding: 0.5rem 1rem; height: 34px; border-radius: 8px;">
+                                <i data-lucide="plus" style="width: 16px;"></i> Thêm quan hệ
+                            </button>
+                            <div style="width: 1px; height: 24px; background: var(--border-color);"></div>
+                            <select id="rel-filter-type" class="filter-select" style="min-width: 140px; height: 34px; font-size: 0.8rem;">
+                                <option value="all">Tất cả loại quan hệ</option>
+                                <option value="huong_dan">Hướng dẫn</option>
+                                <option value="sua_doi">Sửa đổi</option>
+                                <option value="bo_sung">Bổ sung</option>
+                                <option value="bai_bo">Bãi bỏ</option>
+                                <option value="thay_the">Thay thế</option>
+                            </select>
+                            <select id="rel-filter-doc" class="filter-select" style="min-width: 200px; height: 34px; font-size: 0.8rem;">
+                                <option value="all">Tất cả văn bản</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <button class="action-btn" id="rel-zoom-in" title="Phóng to"><i data-lucide="zoom-in" style="width: 18px;"></i></button>
+                            <button class="action-btn" id="rel-zoom-out" title="Thu nhỏ"><i data-lucide="zoom-out" style="width: 18px;"></i></button>
+                            <button class="action-btn" id="rel-reset-view" title="Về vị trí gốc"><i data-lucide="maximize" style="width: 18px;"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Main Content -->
+                    <div class="relations-body">
+                        <!-- SVG Canvas -->
+                        <div class="relations-canvas" id="relations-canvas">
+                            <svg id="relations-svg" width="100%" height="100%"></svg>
+                            <!-- Legend -->
+                            <div class="relations-legend" id="relations-legend">
+                                <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.3rem;">LOẠI VĂN BẢN</div>
+                                <div class="legend-item"><span class="legend-color" style="background: #3b82f6;"></span>Luật</div>
+                                <div class="legend-item"><span class="legend-color" style="background: #10b981;"></span>Nghị định</div>
+                                <div class="legend-item"><span class="legend-color" style="background: #f59e0b;"></span>Thông tư</div>
+                                <div class="legend-item"><span class="legend-color" style="background: #8b5cf6;"></span>Công văn</div>
+                                <div class="legend-item"><span class="legend-color" style="background: #ef4444;"></span>Quyết định</div>
+                                <div class="legend-item"><span class="legend-color" style="background: #6b7280;"></span>Khác</div>
+                                <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin: 0.4rem 0 0.3rem;">QUAN HỆ</div>
+                                <div class="legend-item"><span class="legend-line" style="border-color: #3b82f6;"></span>Hướng dẫn</div>
+                                <div class="legend-item"><span class="legend-line" style="border-color: #f59e0b; border-style: dashed;"></span>Sửa đổi</div>
+                                <div class="legend-item"><span class="legend-line" style="border-color: #10b981;"></span>Bổ sung</div>
+                                <div class="legend-item"><span class="legend-line" style="border-color: #ef4444; border-style: dashed;"></span>Bãi bỏ</div>
+                                <div class="legend-item"><span class="legend-line" style="border-color: #8b5cf6; border-width: 3px;"></span>Thay thế</div>
+                            </div>
+                            <!-- Empty State -->
+                            <div class="relations-empty" id="relations-empty">
+                                <i data-lucide="git-branch" style="width: 48px; height: 48px; color: var(--text-muted); opacity: 0.5;"></i>
+                                <p style="font-size: 1rem; font-weight: 600; color: var(--text-main);">Chưa có quan hệ nào</p>
+                                <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 400px;">Bấm "Thêm quan hệ" để bắt đầu xây dựng sơ đồ mối liên hệ giữa các văn bản pháp luật.</p>
+                            </div>
+                        </div>
+
+                        <!-- Detail Panel -->
+                        <div class="relations-detail-panel" id="relations-detail-panel">
+                            <div class="rel-detail-header">
+                                <h4 style="font-size: 0.9rem; font-weight: 700;">Chi tiết văn bản</h4>
+                                <button class="action-btn" id="rel-detail-close" style="padding: 2px;"><i data-lucide="x" style="width: 16px;"></i></button>
+                            </div>
+                            <div id="rel-detail-content" style="flex: 1; overflow-y: auto; padding: 1rem;">
+                                <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding-top: 2rem;">Chọn một nút trên sơ đồ để xem chi tiết</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 7. Timeline Hiệu Lực Page -->
+            <section id="timeline-page" class="page-container" style="padding: 0;">
+                <div class="timeline-page-container">
+                    <!-- Toolbar -->
+                    <div class="timeline-toolbar">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <select id="timeline-filter-field" class="filter-select">
+                                <!-- Populated from FIELD_HIERARCHY in app.js -->
+                            </select>
+                            <select id="timeline-filter-type" class="filter-select">
+                                <option value="all">Tất cả loại</option>
+                                <option value="Luật">Luật</option>
+                                <option value="Nghị định">Nghị định</option>
+                                <option value="Thông tư">Thông tư</option>
+                                <option value="Công văn">Công văn</option>
+                                <option value="Quyết định">Quyết định</option>
+                                <option value="Khác">Khác</option>
+                            </select>
+                            <select id="timeline-filter-status" class="filter-select">
+                                <option value="all">Tất cả trạng thái</option>
+                                <option value="active">Còn hiệu lực</option>
+                                <option value="expired">Hết hiệu lực</option>
+                                <option value="unknown">Chưa xác định ngày</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                            <div class="legend-item"><span class="legend-color" style="background: #10b981;"></span>Còn hiệu lực</div>
+                            <div class="legend-item"><span class="legend-color" style="background: #ef4444;"></span>Hết hiệu lực</div>
+                            <div class="legend-item"><span class="legend-color" style="background: #6b7280;"></span>Chưa xác định ngày</div>
+                            <div class="legend-item"><span class="legend-color" style="background: #fbbf24; width: 2px; height: 14px; border-radius: 0;"></span>Hôm nay</div>
+                        </div>
+                    </div>
+
+                    <!-- Timeline Body -->
+                    <div class="timeline-body" id="timeline-body">
+                        <div class="timeline-axis-row" id="timeline-axis-row">
+                            <div class="timeline-label-spacer"></div>
+                            <div class="timeline-axis-track" id="timeline-axis-track"></div>
+                        </div>
+                        <div class="timeline-rows" id="timeline-rows"></div>
+                        <div class="timeline-empty" id="timeline-empty" style="display: none;">
+                            <i data-lucide="calendar-range" style="width: 48px; height: 48px; color: var(--text-muted); opacity: 0.5;"></i>
+                            <p style="font-size: 1rem; font-weight: 600; color: var(--text-main);">Chưa có văn bản nào có ngày hiệu lực</p>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 400px;">Hãy nhập "Ngày hiệu lực" khi tải lên hoặc sửa văn bản để hiển thị trên dòng thời gian.</p>
+                        </div>
+                    </div>
+            </section>
+
+            <!-- 8. Field Configuration Page -->
+            <section id="fields-page" class="page-container">
+                <div class="fields-mgmt-container" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.5rem; height: 100%; overflow: hidden; padding: 1.5rem;">
+                    <!-- Left Column: Fields list -->
+                    <div class="glass-card fields-list-card" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+                        <h3 class="section-title" style="margin-bottom: 0.5rem;">
+                            <i data-lucide="list-tree" style="color: var(--primary-color); vertical-align: middle; margin-right: 0.4rem;"></i> Danh sách lĩnh vực quy định
+                        </h3>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+                            Nhấp vào biểu tượng chỉnh sửa (<i data-lucide="pencil" style="width:12px; display:inline-block;"></i>) để đổi tên hoặc di chuyển nhóm/lĩnh vực. Xóa bằng biểu tượng thùng rác (<i data-lucide="trash-2" style="width:12px; display:inline-block; color:var(--danger-color);"></i>).
+                        </p>
+                        <div id="fields-tree-container" class="fields-tree-container" style="flex: 1; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Add/Edit controls -->
+                    <div class="fields-mgmt-actions-wrapper" style="overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; padding-right: 0.5rem;">
+                        <!-- Add Group Card -->
+                        <div class="glass-card fields-action-card">
+                            <h3 class="section-title">
+                                <i data-lucide="folder-plus" style="color: var(--success-color); vertical-align: middle; margin-right: 0.4rem;"></i> Thêm nhóm lĩnh vực mới
+                            </h3>
+                            <div class="form-group" style="margin-top: 1rem;">
+                                <label for="new-group-name" style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 500;">Tên nhóm lĩnh vực</label>
+                                <input type="text" id="new-group-name" class="form-input" placeholder="Ví dụ: Lao động, Hải quan, Thuế doanh nghiệp...">
+                            </div>
+                            <button class="btn-primary" id="add-group-btn" style="margin-top: 1rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                <i data-lucide="plus" style="width: 16px;"></i> Tạo Nhóm mới
+                            </button>
+                        </div>
+
+                        <!-- Add Field Card -->
+                        <div class="glass-card fields-action-card">
+                            <h3 class="section-title">
+                                <i data-lucide="file-plus" style="color: var(--primary-color); vertical-align: middle; margin-right: 0.4rem;"></i> Thêm lĩnh vực quy định mới
+                            </h3>
+                            <div class="form-group" style="margin-top: 1rem;">
+                                <label for="new-field-label" style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 500;">Tên lĩnh vực hiển thị</label>
+                                <input type="text" id="new-field-label" class="form-input" placeholder="Ví dụ: Bảo hiểm thất nghiệp, Giá tính thuế...">
+                            </div>
+                            <div class="form-group" style="margin-top: 0.75rem;">
+                                <label for="new-field-group" style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 500;">Thuộc nhóm lĩnh vực</label>
+                                <select id="new-field-group" class="filter-select" style="width: 100%;">
+                                    <option value="">-- Độc lập (Không thuộc nhóm nào) --</option>
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                            <button class="btn-primary" id="add-field-btn" style="margin-top: 1rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                <i data-lucide="plus" style="width: 16px;"></i> Tạo Lĩnh vực mới
+                            </button>
+                        </div>
+
+                        <!-- General settings card (Reset to default) -->
+                        <div class="glass-card fields-action-card" style="border-color: rgba(239, 68, 68, 0.25);">
+                            <h3 class="section-title" style="color: var(--danger-color);">
+                                <i data-lucide="alert-triangle" style="vertical-align: middle; margin-right: 0.4rem;"></i> Cài đặt nâng cao
+                            </h3>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.75rem 0 1rem; line-height: 1.4;">
+                                Thiết lập lại toàn bộ phân loại lĩnh vực quy định về cấu hình mặc định ban đầu của LegalDoc Auditor. Lưu ý: Thao tác này không xóa văn bản, nhưng các văn bản thuộc lĩnh vực đã bị xóa sẽ cần phân loại lại.
+                            </p>
+                            <button class="action-btn" id="reset-fields-default-btn" style="color: var(--danger-color); border-color: var(--danger-color); background: transparent; padding: 0.6rem 1rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;">
+                                <i data-lucide="refresh-ccw" style="width: 16px;"></i> Thiết lập lại lĩnh vực mặc định
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Group/Field Overlay Modal -->
+                <div class="modal-overlay" id="edit-field-item-modal" style="display: none; justify-content: center; align-items: center; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; backdrop-filter: blur(4px);">
+                    <div class="glass-card modal-content" style="width: 450px; padding: 1.75rem; background: var(--bg-card); border: var(--glass-border); border-radius: 12px; box-shadow: var(--glass-shadow);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                            <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: var(--text-main);" id="edit-field-modal-title">Chỉnh sửa phân loại</h3>
+                            <button class="action-btn" id="edit-field-modal-close" style="padding: 2px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"><i data-lucide="x" style="width: 18px;"></i></button>
+                        </div>
+                        <input type="hidden" id="edit-field-item-type"> <!-- 'group' or 'field' -->
+                        <input type="hidden" id="edit-field-item-old-val"> <!-- old group name or old field value -->
+                        
+                        <div class="form-group" id="edit-field-group-only-fields" style="display: none; margin-bottom: 0.75rem;">
+                            <label for="edit-field-item-label" style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 500;">Tên lĩnh vực hiển thị</label>
+                            <input type="text" id="edit-field-item-label" class="form-input" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 0.75rem;">
+                            <label for="edit-field-item-name" id="edit-field-item-name-label" style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 500;">Tên phân loại (Mã/Giá trị)</label>
+                            <input type="text" id="edit-field-item-name" class="form-input" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group" id="edit-field-parent-group-row" style="margin-top: 0.75rem; display: none;">
+                            <label for="edit-field-parent-group" style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 500;">Di chuyển sang nhóm</label>
+                            <select id="edit-field-parent-group" class="filter-select" style="width: 100%;">
+                                <option value="">-- Độc lập (Không thuộc nhóm nào) --</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.75rem;">
+                            <button class="action-btn" id="edit-field-modal-cancel-btn" style="padding: 0.5rem 1rem;">Hủy</button>
+                            <button class="btn-primary" id="edit-field-modal-save-btn" style="width: auto; padding: 0.5rem 1.25rem;">Lưu thay đổi</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Active annotation popover (Absolute position overlay) -->
+    <div class="note-popover" id="annotation-popover" style="display: none; flex-direction: column; width: 340px; padding: 1rem; gap: 0.75rem;">
+        <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">Bôi đen: <span id="popover-selected-preview" style="font-style: italic;">...</span></span>
+        
+        <!-- Action Type Select -->
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Loại tác vụ:</span>
+            <select id="popover-note-type" class="filter-select" style="min-width: auto; flex-grow: 1; padding: 0.25rem 0.5rem; font-size: 0.75rem; height: 30px;">
+                <option value="normal">Ghi chú thường</option>
+                <option value="amended">Điều khoản Sửa đổi (Bôi vàng chữ đỏ)</option>
+                <option value="abolished">Điều khoản Bãi bỏ (Bôi vàng chữ đỏ gạch chân)</option>
+                <option value="supplemented">Điều khoản Bổ sung (Thêm đoạn bổ sung)</option>
+                <option value="guided">Điều khoản được Hướng dẫn (Bôi xanh dương chữ đen)</option>
+            </select>
+        </div>
+
+        <!-- Formatting Toolbar -->
+        <div id="popover-formatting-toolbar" class="toolbar-row" style="display: flex; gap: 0.5rem; align-items: center; margin: 0.15rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">
+            <!-- Bold & Italic -->
+            <button type="button" class="format-btn" id="format-bold" title="In đậm (Ctrl+B)" style="font-weight: bold; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); width: 28px; height: 28px; border-radius: 4px; cursor: pointer;">B</button>
+            <button type="button" class="format-btn" id="format-italic" title="In nghiêng (Ctrl+I)" style="font-style: italic; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); width: 28px; height: 28px; border-radius: 4px; cursor: pointer;">I</button>
+            <button type="button" class="format-btn" id="format-underline" title="Gạch chân (Ctrl+U)" style="text-decoration: underline; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); width: 28px; height: 28px; border-radius: 4px; cursor: pointer;">U</button>
+            
+            <div style="width: 1px; height: 20px; background-color: var(--border-color); margin: 0 0.15rem;"></div>
+            
+            <!-- Text Color -->
+            <span style="font-size: 0.7rem; color: var(--text-muted);">Chữ:</span>
+            <div class="color-dot active" data-color="inherit" style="background-color: var(--text-main); width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.4);" title="Mặc định"></div>
+            <div class="color-dot" data-color="#ef4444" style="background-color: #ef4444; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);" title="Đỏ"></div>
+            <div class="color-dot" data-color="#3b82f6" style="background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);" title="Xanh dương"></div>
+            <div class="color-dot" data-color="#10b981" style="background-color: #10b981; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);" title="Xanh lá"></div>
+
+            <div style="width: 1px; height: 20px; background-color: var(--border-color); margin: 0 0.15rem;"></div>
+
+            <!-- Highlight Background Color -->
+            <span style="font-size: 0.7rem; color: var(--text-muted);">Nền:</span>
+            <div class="color-dot active" data-bg="rgba(253, 224, 71, 0.4)" style="background-color: rgba(253, 224, 71, 0.9); width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.4);" title="Vàng"></div>
+            <div class="color-dot" data-bg="rgba(16, 185, 129, 0.4)" style="background-color: rgba(16, 185, 129, 0.9); width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);" title="Xanh lá"></div>
+            <div class="color-dot" data-bg="rgba(59, 130, 246, 0.4)" style="background-color: rgba(59, 130, 246, 0.9); width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);" title="Xanh dương"></div>
+            <div class="color-dot" data-bg="rgba(244, 114, 182, 0.4)" style="background-color: rgba(244, 114, 182, 0.9); width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);" title="Hồng"></div>
+            <div class="color-dot" data-bg="transparent" style="background-color: transparent; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px dashed var(--text-muted);" title="Không nền"></div>
+        </div>
+
+        <!-- Supplemental Fields (Shown only for supplemented type) -->
+        <div id="supplement-fields" style="display: none; flex-direction: column; gap: 0.5rem; margin-top: 0.15rem;">
+            <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Nội dung đoạn văn bản bổ sung:</span>
+                <textarea id="popover-supplemental-text" rows="3" placeholder="Nhập nội dung điều khoản bổ sung..." style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; padding: 0.4rem; resize: none; font-size: 0.8rem;"></textarea>
+            </div>
+        </div>
+
+        <!-- Reference Document Selector (Shown for supplemented and guided types) -->
+        <div id="ref-doc-fields" style="display: none; flex-direction: column; gap: 0.2rem; margin-top: 0.15rem;">
+            <span id="ref-doc-label" style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Văn bản dẫn chiếu:</span>
+            <select id="popover-ref-doc" class="filter-select" style="min-width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem; height: 30px;">
+                <option value="">-- Chọn văn bản dẫn chiếu --</option>
+            </select>
+        </div>
+
+        <textarea id="popover-note-text" rows="3" placeholder="Nhập ghi chú giải trình (không bắt buộc). Có thể dán link để bấm mở trực tiếp." style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; padding: 0.5rem; resize: none; font-size: 0.85rem;"></textarea>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button class="action-btn" id="popover-close-btn" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Hủy</button>
+            <button class="btn-primary" id="popover-save-btn" style="width: auto; font-size: 0.75rem; padding: 0.3rem 0.8rem; border-radius: 4px;">Áp dụng</button>
+        </div>
+    </div>
+
+    <!-- Relation Add Modal -->
+    <div class="rel-modal-overlay" id="rel-modal-overlay" style="display: none;">
+        <div class="rel-modal glass-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1rem; font-weight: 700;">Thêm quan hệ văn bản</h3>
+                <button class="action-btn" id="rel-modal-close"><i data-lucide="x" style="width: 18px;"></i></button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Văn bản nguồn (VB hướng dẫn / sửa đổi / bổ sung...)</label>
+                    <select id="rel-source-doc" class="filter-select" style="width: 100%; height: 36px;">
+                        <option value="">-- Chọn văn bản nguồn --</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Loại quan hệ</label>
+                    <select id="rel-type-select" class="filter-select" style="width: 100%; height: 36px;">
+                        <option value="huong_dan">Hướng dẫn thi hành</option>
+                        <option value="sua_doi">Sửa đổi</option>
+                        <option value="bo_sung">Bổ sung</option>
+                        <option value="bai_bo">Bãi bỏ</option>
+                        <option value="thay_the">Thay thế</option>
+                    </select>
+                </div>
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem;">
+                    <i data-lucide="arrow-down" style="width: 20px; display: inline;"></i>
+                    <span id="rel-direction-label" style="font-weight: 600;">hướng dẫn cho</span>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Văn bản đích (VB được hướng dẫn / sửa đổi / bổ sung...)</label>
+                    <select id="rel-target-doc" class="filter-select" style="width: 100%; height: 36px;">
+                        <option value="">-- Chọn văn bản đích --</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Ghi chú (không bắt buộc)</label>
+                    <input type="text" id="rel-note-input" class="form-input" placeholder="Ví dụ: Hướng dẫn Chương III về thuế GTGT" style="height: 36px; font-size: 0.85rem;">
+                </div>
+                <button class="btn-primary" id="rel-save-btn" style="margin-top: 0.5rem;">
+                    <i data-lucide="link" style="width: 16px;"></i> Tạo liên kết quan hệ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Edit Modal -->
+    <div class="rel-modal-overlay" id="doc-edit-modal-overlay" style="display: none;">
+        <div class="rel-modal glass-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1rem; font-weight: 700;">Sửa thông tin văn bản</h3>
+                <button class="action-btn" id="doc-edit-modal-close"><i data-lucide="x" style="width: 18px;"></i></button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Tên văn bản *</label>
+                    <input type="text" id="doc-edit-title" class="form-input" required placeholder="Ví dụ: Quy định về kê khai thuế Giá trị gia tăng">
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Số hiệu văn bản</label>
+                        <input type="text" id="doc-edit-number" class="form-input" placeholder="Ví dụ: 80/2021/TT-BTC">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Loại văn bản *</label>
+                        <select id="doc-edit-type" class="filter-select" style="width: 100%; height: 36px;" required>
+                            <option value="Luật">Luật</option>
+                            <option value="Nghị định">Nghị định</option>
+                            <option value="Thông tư">Thông tư</option>
+                            <option value="Công văn">Công văn</option>
+                            <option value="Quyết định">Quyết định</option>
+                            <option value="Khác">Khác</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Link nguồn văn bản (không bắt buộc)</label>
+                    <input type="url" id="doc-edit-source-url" class="form-input" placeholder="https://thuvienphapluat.vn/...">
+                </div>
+                <div class="form-group" style="margin-bottom: 0; display: none;" id="doc-edit-authority-group">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Cơ quan ban hành</label>
+                    <select id="doc-edit-authority-category" class="filter-select" style="width: 100%; height: 36px;">
+                        <option value="">-- Chọn cơ quan ban hành --</option>
+                        <option value="Tổng cục Thuế">Tổng cục Thuế</option>
+                        <option value="Bộ Tài chính">Bộ Tài chính</option>
+                        <option value="thue_tinh">Thuế tỉnh/thành...</option>
+                        <option value="ubnd">UBND tỉnh/thành...</option>
+                        <option value="bo_khac">Bộ khác...</option>
+                        <option value="co_quan_khac">Cơ quan khác...</option>
+                    </select>
+                    <input type="text" id="doc-edit-authority-province" class="form-input" list="vn-province-list" placeholder="Nhập hoặc tìm tỉnh/thành..." style="margin-top: 0.5rem; height: 36px; display: none;">
+                    <input type="text" id="doc-edit-authority-custom" class="form-input" placeholder="Nhập tên cơ quan..." style="margin-top: 0.5rem; height: 36px; display: none;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Phân loại Lĩnh vực * (có thể chọn nhiều)</label>
+                    <div class="field-checkbox-box" id="doc-edit-field-box">
+                        <!-- Populated from FIELD_HIERARCHY in app.js -->
+                    </div>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Ngày ban hành</label>
+                        <input type="text" id="doc-edit-issue-date" class="form-input" placeholder="Ví dụ: 15/08/2026">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Ngày hiệu lực</label>
+                        <input type="text" id="doc-edit-effective-date" class="form-input" placeholder="Ví dụ: 01/01/2027">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Ngày hết hiệu lực (để trống nếu còn hiệu lực)</label>
+                    <input type="text" id="doc-edit-expiry-date" class="form-input" placeholder="Ví dụ: 31/12/2030">
+                </div>
+                <button class="btn-primary" id="doc-edit-save-btn" style="margin-top: 0.5rem;">
+                    <i data-lucide="check" style="width: 16px;"></i> Lưu thay đổi
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Snippet Compare Modal: paste an old + new paragraph, diff them word-by-word -->
+    <div class="rel-modal-overlay" id="snippet-compare-modal-overlay" style="display: none;">
+        <div class="rel-modal glass-panel" style="width: 720px; max-width: 92vw;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1rem; font-weight: 700;">So sánh đoạn văn bản</h3>
+                <button class="action-btn" id="snippet-compare-close"><i data-lucide="x" style="width: 18px;"></i></button>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: -0.5rem 0 1rem;">Dán đoạn văn bản cũ và đoạn tương ứng ở văn bản mới để đối chiếu từng câu từ — không cần 2 văn bản có cấu trúc giống nhau.</p>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 260px; margin-bottom: 0;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Đoạn văn bản cũ</label>
+                        <textarea id="snippet-old-text" rows="7" class="form-input" style="resize: vertical; font-family: inherit; line-height: 1.5;" placeholder="Dán đoạn văn bản cũ vào đây..."></textarea>
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 260px; margin-bottom: 0;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Đoạn văn bản mới</label>
+                        <textarea id="snippet-new-text" rows="7" class="form-input" style="resize: vertical; font-family: inherit; line-height: 1.5;" placeholder="Dán đoạn văn bản mới vào đây..."></textarea>
+                    </div>
+                </div>
+                <button class="btn-primary" id="snippet-compare-run-btn">
+                    <i data-lucide="git-compare" style="width: 16px;"></i> So sánh khác biệt
+                </button>
+                <div id="snippet-compare-result" style="display: none;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">Kết quả khác biệt</label>
+                    <div id="snippet-compare-result-body" style="background: var(--paper-bg); color: var(--paper-text); padding: 1rem; border-radius: 8px; max-height: 300px; overflow-y: auto; font-family: 'Merriweather', serif; font-size: 13px; line-height: 1.7; white-space: pre-line;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared province/city suggestions for the "Cơ quan ban hành" fields (still free-text, just autocompleted) -->
+    <datalist id="vn-province-list">
+        <option value="Hà Nội"></option>
+        <option value="TP. Hồ Chí Minh"></option>
+        <option value="Hải Phòng"></option>
+        <option value="Đà Nẵng"></option>
+        <option value="Cần Thơ"></option>
+        <option value="An Giang"></option>
+        <option value="Bà Rịa - Vũng Tàu"></option>
+        <option value="Bạc Liêu"></option>
+        <option value="Bắc Giang"></option>
+        <option value="Bắc Kạn"></option>
+        <option value="Bắc Ninh"></option>
+        <option value="Bến Tre"></option>
+        <option value="Bình Định"></option>
+        <option value="Bình Dương"></option>
+        <option value="Bình Phước"></option>
+        <option value="Bình Thuận"></option>
+        <option value="Cà Mau"></option>
+        <option value="Cao Bằng"></option>
+        <option value="Đắk Lắk"></option>
+        <option value="Đắk Nông"></option>
+        <option value="Điện Biên"></option>
+        <option value="Đồng Nai"></option>
+        <option value="Đồng Tháp"></option>
+        <option value="Gia Lai"></option>
+        <option value="Hà Giang"></option>
+        <option value="Hà Nam"></option>
+        <option value="Hà Tĩnh"></option>
+        <option value="Hải Dương"></option>
+        <option value="Hậu Giang"></option>
+        <option value="Hòa Bình"></option>
+        <option value="Hưng Yên"></option>
+        <option value="Khánh Hòa"></option>
+        <option value="Kiên Giang"></option>
+        <option value="Kon Tum"></option>
+        <option value="Lai Châu"></option>
+        <option value="Lâm Đồng"></option>
+        <option value="Lạng Sơn"></option>
+        <option value="Lào Cai"></option>
+        <option value="Long An"></option>
+        <option value="Nam Định"></option>
+        <option value="Nghệ An"></option>
+        <option value="Ninh Bình"></option>
+        <option value="Ninh Thuận"></option>
+        <option value="Phú Thọ"></option>
+        <option value="Phú Yên"></option>
+        <option value="Quảng Bình"></option>
+        <option value="Quảng Nam"></option>
+        <option value="Quảng Ngãi"></option>
+        <option value="Quảng Ninh"></option>
+        <option value="Quảng Trị"></option>
+        <option value="Sóc Trăng"></option>
+        <option value="Sơn La"></option>
+        <option value="Tây Ninh"></option>
+        <option value="Thái Bình"></option>
+        <option value="Thái Nguyên"></option>
+        <option value="Thanh Hóa"></option>
+        <option value="Thừa Thiên Huế"></option>
+        <option value="Tiền Giang"></option>
+        <option value="Trà Vinh"></option>
+        <option value="Tuyên Quang"></option>
+        <option value="Vĩnh Long"></option>
+        <option value="Vĩnh Phúc"></option>
+        <option value="Yên Bái"></option>
+    </datalist>
+
+    <!-- QR Code / Mobile Sync Modal -->
+    <div class="rel-modal-overlay" id="qr-modal-overlay" style="display: none;">
+        <div class="rel-modal glass-panel" style="max-width: 380px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                <h3 style="font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                    <i data-lucide="smartphone" style="color: var(--primary-color); width: 18px;"></i> Sử dụng trên Điện thoại
+                </h3>
+                <button class="action-btn" id="qr-modal-close"><i data-lucide="x" style="width: 18px;"></i></button>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center;">
+                <p style="font-size: 0.8rem; color: var(--text-muted);">
+                    Kết nối điện thoại và máy tính vào <strong>cùng mạng Wi-Fi</strong>, sau đó quét mã QR bên dưới để mở ứng dụng trên điện thoại:
+                </p>
+                
+                <!-- QR Code Canvas Container -->
+                <div id="qrcode-container" style="padding: 1rem; background: white; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+                
+                <div style="width: 100%;">
+                    <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.25rem; letter-spacing: 0.5px;">HOẶC TRUY CẬP ĐƯỜNG DẪN:</div>
+                    <a id="qr-lan-link" href="#" target="_blank" style="font-size: 0.85rem; font-weight: 600; color: var(--primary-color); word-break: break-all; text-decoration: underline;">http://192.168.1.x:8090</a>
+                </div>
+                
+                <div style="border-top: 1px solid var(--border-color); padding-top: 0.75rem; width: 100%; font-size: 0.72rem; text-align: left; color: var(--text-muted); line-height: 1.4;">
+                    <strong>💡 Mẹo bảo mật & tiện lợi:</strong> Nếu bạn tải mã nguồn này lên <strong>GitHub Pages</strong>, hãy đăng nhập cùng tài khoản Google Drive trên điện thoại và máy tính để tự động đồng bộ mọi lúc mọi nơi mà không cần mở máy tính!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Drive Sync Settings Modal -->
+    <div class="rel-modal-overlay" id="gdrive-settings-overlay" style="display: none;">
+        <div class="rel-modal glass-panel" style="max-width: 400px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                    <i data-lucide="settings" style="color: var(--primary-color); width: 18px;"></i> Cấu hình Google Cloud API
+                </h3>
+                <button class="action-btn" id="gdrive-settings-close"><i data-lucide="x" style="width: 18px;"></i></button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">OAuth Client ID của bạn (Bắt buộc nếu chạy trên Domain riêng)</label>
+                    <input type="text" id="gdrive-client-id-input" class="form-input" placeholder="Nhập Google Client ID..." style="height: 36px; font-size: 0.8rem;">
+                    <p style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.4rem; line-height: 1.45;">
+                        Ứng dụng đã cấu hình sẵn Client ID để chạy ngay trên <code>http://localhost:8090</code>. 
+                        Nếu bạn chạy trên GitHub Pages hoặc máy chủ riêng, bạn cần lên Google Cloud Console tạo <strong>OAuth Client ID</strong> cho Web Application và dán vào đây để lưu trữ.
+                    </p>
+                </div>
+                <button class="btn-primary" id="gdrive-settings-save-btn" style="margin-top: 0.5rem;">
+                    <i data-lucide="save" style="width: 16px;"></i> Lưu cấu hình Client ID
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main JavaScript Logic -->
+    <script src="db.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
