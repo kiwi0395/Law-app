@@ -147,6 +147,11 @@ function initFieldTaxonomyUI() {
 
     const timelineFilterFieldSelect = document.getElementById('timeline-filter-field');
     timelineFilterFieldSelect.innerHTML = '<option value="all">Tất cả lĩnh vực</option>' + renderFieldSelectOptions();
+
+    const relFilterFieldSelect = document.getElementById('rel-filter-field');
+    if (relFilterFieldSelect) {
+        relFilterFieldSelect.innerHTML = '<option value="all">Tất cả lĩnh vực</option>' + renderFieldSelectOptions();
+    }
 }
 
 // Main-field "chuyên đề" tabs at the top of the Library page
@@ -3264,6 +3269,7 @@ function setupRelationsHandlers() {
 
     const filterType = document.getElementById('rel-filter-type');
     const filterDoc = document.getElementById('rel-filter-doc');
+    const filterField = document.getElementById('rel-filter-field');
 
     const zoomInBtn = document.getElementById('rel-zoom-in');
     const zoomOutBtn = document.getElementById('rel-zoom-out');
@@ -3322,6 +3328,9 @@ function setupRelationsHandlers() {
 
     filterType.addEventListener('change', renderRelationsDiagram);
     filterDoc.addEventListener('change', renderRelationsDiagram);
+    if (filterField) {
+        filterField.addEventListener('change', renderRelationsDiagram);
+    }
 
     zoomInBtn.addEventListener('click', () => {
         relZoom = Math.min(relZoom + 0.15, 2.5);
@@ -3422,6 +3431,8 @@ function renderRelationsDiagram() {
     const emptyState = document.getElementById('relations-empty');
     const filterTypeVal = document.getElementById('rel-filter-type').value;
     const filterDocVal = document.getElementById('rel-filter-doc').value;
+    const filterFieldEl = document.getElementById('rel-filter-field');
+    const filterFieldVal = filterFieldEl ? filterFieldEl.value : 'all';
 
     svg.innerHTML = '';
 
@@ -3432,6 +3443,16 @@ function renderRelationsDiagram() {
     if (filterDocVal !== 'all') {
         const docIdNum = Number(filterDocVal);
         relations = relations.filter(r => r.sourceDocId === docIdNum || r.targetDocId === docIdNum);
+    }
+    if (filterFieldVal !== 'all') {
+        relations = relations.filter(r => {
+            const srcDoc = state.documents.find(d => d.id === r.sourceDocId);
+            const tgtDoc = state.documents.find(d => d.id === r.targetDocId);
+            return srcDoc && tgtDoc && (
+                getDocFields(srcDoc).includes(filterFieldVal) ||
+                getDocFields(tgtDoc).includes(filterFieldVal)
+            );
+        });
     }
 
     // Collect involved doc ids (only keep ones that still exist)
