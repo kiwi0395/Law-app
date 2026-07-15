@@ -146,6 +146,7 @@ class LegalDB {
                 parsedHtml: doc.parsedHtml || '', // Nội dung văn bản
                 pdfBlob: doc.pdfBlob || null, // File PDF đính kèm
                 wordBlob: doc.wordBlob || null, // File Word đính kèm
+                isFavorite: doc.isFavorite || false, // Văn bản yêu thích
                 createdAt: doc.createdAt || now,
                 updatedAt: now
             });
@@ -202,6 +203,29 @@ class LegalDB {
                 doc.issuingAuthority = updates.issuingAuthority || '';
                 doc.sourceUrl = updates.sourceUrl || '';
                 doc.updatedAt = new Date().toISOString(); // Cập nhật mốc thời gian sửa đổi
+
+                const putRequest = store.put(doc);
+                putRequest.onsuccess = () => resolve(true);
+                putRequest.onerror = (event) => reject(event.target.error);
+            };
+            getRequest.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    setFavorite(id, isFavorite) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['documents'], 'readwrite');
+            const store = transaction.objectStore('documents');
+
+            const getRequest = store.get(Number(id));
+            getRequest.onsuccess = () => {
+                const doc = getRequest.result;
+                if (!doc) {
+                    reject(new Error("Document not found"));
+                    return;
+                }
+                doc.isFavorite = !!isFavorite;
+                doc.updatedAt = new Date().toISOString();
 
                 const putRequest = store.put(doc);
                 putRequest.onsuccess = () => resolve(true);

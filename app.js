@@ -873,6 +873,11 @@ function renderExpiredBadge(doc) {
 function createDocRow(doc, { showType = true, showAuthority = false } = {}) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
+        <td style="text-align: center; width: 40px;">
+            <button class="action-btn toggle-fav-btn" data-id="${doc.id}" style="background: none; border: none; padding: 0.25rem; display: inline-flex; align-items: center; justify-content: center;" title="${doc.isFavorite ? 'Bỏ yêu thích' : 'Yêu thích'}">
+                <i data-lucide="star" class="fav-star-icon" style="width: 16px; height: 16px; transition: all 0.2s; ${doc.isFavorite ? 'color: #f59e0b; fill: #f59e0b;' : 'color: var(--text-muted); fill: transparent;'}"></i>
+            </button>
+        </td>
         <td><strong>${doc.number || 'Chưa rõ'}</strong></td>
         <td><span style="font-weight: 500;">${doc.title}</span>${renderExpiredBadge(doc)}</td>
         <td>${renderFieldBadges(getDocFields(doc))}</td>
@@ -889,6 +894,35 @@ function createDocRow(doc, { showType = true, showAuthority = false } = {}) {
         </td>
     `;
 
+    tr.querySelector('.toggle-fav-btn').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const btn = tr.querySelector('.toggle-fav-btn');
+        const star = btn.querySelector('.fav-star-icon');
+        const isFav = !doc.isFavorite;
+
+        await db.setFavorite(doc.id, isFav);
+        doc.isFavorite = isFav;
+
+        if (isFav) {
+            star.style.color = '#f59e0b';
+            star.style.fill = '#f59e0b';
+            btn.title = 'Bỏ yêu thích';
+        } else {
+            star.style.color = 'var(--text-muted)';
+            star.style.fill = 'transparent';
+            btn.title = 'Yêu thích';
+        }
+
+        if (typeof triggerAutoSync === 'function') {
+            triggerAutoSync();
+        }
+
+        const favFilter = document.getElementById('filter-favorite');
+        if (favFilter && favFilter.checked && !isFav) {
+            populateLibraryTable();
+        }
+    });
+
     tr.querySelector('.view-btn').addEventListener('click', () => openDocumentInViewer(doc.id));
     tr.querySelector('.edit-btn').addEventListener('click', () => openDocEditModal(doc.id));
     tr.querySelector('.compare-btn').addEventListener('click', () => {
@@ -904,8 +938,13 @@ function populateLibraryTable() {
     const fieldFilter = elements.filterField.value;
     const typeFilter = elements.filterType.value;
     const searchFilter = elements.filterSearch.value.toLowerCase().trim();
+    const favFilter = document.getElementById('filter-favorite') ? document.getElementById('filter-favorite').checked : false;
 
     let filtered = state.documents;
+
+    if (favFilter) {
+        filtered = filtered.filter(d => d.isFavorite);
+    }
 
     const activeMainField = state.libraryActiveMainField || 'all';
     if (activeMainField !== 'all') {
@@ -932,7 +971,7 @@ function populateLibraryTable() {
     if (filtered.length === 0) {
         elements.libraryDocsList.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align: center; color: var(--text-muted);">Không tìm thấy văn bản phù hợp.</td>
+                <td colspan="7" style="text-align: center; color: var(--text-muted);">Không tìm thấy văn bản phù hợp.</td>
             </tr>
         `;
     } else {
@@ -944,6 +983,9 @@ function populateLibraryTable() {
 // Add filters listeners
 elements.filterField.addEventListener('change', populateLibraryTable);
 elements.filterType.addEventListener('change', populateLibraryTable);
+if (document.getElementById('filter-favorite')) {
+    document.getElementById('filter-favorite').addEventListener('change', populateLibraryTable);
+}
 elements.filterSearch.addEventListener('input', populateLibraryTable);
 
 // --- Công văn / Tài liệu khác tabs (docType-filtered views of the same library) ---
@@ -963,7 +1005,7 @@ function populateDocTypeTable(tbodyId, searchInputId, docType, emptyMessage) {
 
     tbody.innerHTML = '';
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">${emptyMessage}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">${emptyMessage}</td></tr>`;
     } else {
         filtered.forEach(doc => tbody.appendChild(createDocRow(doc, { showType: false, showAuthority: true })));
     }

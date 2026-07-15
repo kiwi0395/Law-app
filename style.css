@@ -2273,4 +2273,18 @@ del {
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
+/* --- Favorite Toggle Button --- */
+.toggle-fav-btn {
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toggle-fav-btn:hover {
+    transform: scale(1.25);
+}
+
+.toggle-fav-btn:active {
+    transform: scale(0.9);
+}
+
+
 

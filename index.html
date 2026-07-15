@@ -246,12 +246,19 @@
                         <label for="filter-search">Tìm kiếm</label>
                         <input type="text" id="filter-search" class="filter-select" placeholder="Số hiệu hoặc từ khóa..." style="min-width: 250px;">
                     </div>
+                    <div class="filter-group" style="display: flex; flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 1.5rem; margin-left: 0.5rem;">
+                        <input type="checkbox" id="filter-favorite" style="width: 16px; height: 16px; cursor: pointer; accent-color: #f59e0b;">
+                        <label for="filter-favorite" style="cursor: pointer; margin-bottom: 0; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+                            <i data-lucide="star" style="width: 14px; height: 14px; color: #f59e0b; fill: #f59e0b;"></i> Chỉ yêu thích
+                        </label>
+                    </div>
                 </div>
 
                 <div class="doc-table-container">
                     <table class="doc-table">
                         <thead>
                             <tr>
+                                <th style="width: 40px; text-align: center;"><i data-lucide="star" style="width: 14px; height: 14px;"></i></th>
                                 <th>Số hiệu</th>
                                 <th>Tên văn bản</th>
                                 <th>Lĩnh vực</th>
@@ -262,7 +269,7 @@
                         </thead>
                         <tbody id="library-docs-list">
                             <tr>
-                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Đang tải danh sách văn bản...</td>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted);">Đang tải danh sách văn bản...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -285,6 +292,7 @@
                     <table class="doc-table">
                         <thead>
                             <tr>
+                                <th style="width: 40px; text-align: center;"><i data-lucide="star" style="width: 14px; height: 14px;"></i></th>
                                 <th>Số hiệu</th>
                                 <th>Tên văn bản</th>
                                 <th>Lĩnh vực</th>
@@ -295,7 +303,7 @@
                         </thead>
                         <tbody id="congvan-docs-list">
                             <tr>
-                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Đang tải danh sách công văn...</td>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted);">Đang tải danh sách công văn...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -318,6 +326,7 @@
                     <table class="doc-table">
                         <thead>
                             <tr>
+                                <th style="width: 40px; text-align: center;"><i data-lucide="star" style="width: 14px; height: 14px;"></i></th>
                                 <th>Số hiệu</th>
                                 <th>Tên văn bản</th>
                                 <th>Lĩnh vực</th>
@@ -328,7 +337,7 @@
                         </thead>
                         <tbody id="khac-docs-list">
                             <tr>
-                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Đang tải danh sách tài liệu...</td>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted);">Đang tải danh sách tài liệu...</td>
                             </tr>
                         </tbody>
                     </table>
