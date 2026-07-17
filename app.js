@@ -358,6 +358,7 @@ async function initApp() {
         setupGlobalSearch();
         setupBackupHandlers();
         setupEditFieldItemModalHandlers();
+        initAIAssistant();
 
         // Khởi tạo Google Drive Sync & Mobile Support
         if (typeof setupGDriveUIHandlers === 'function') {
@@ -2303,8 +2304,8 @@ function setupViewerPanelControls() {
         syncMobileOverlayBackdrop();
     });
 
-    setupResizeHandle(outlineHandle, outlineSidebar, 'left', 180, 480, 'viewerOutlineWidth');
-    setupResizeHandle(notesHandle, notesSidebar, 'right', 220, 520, 'viewerNotesWidth');
+    setupResizeHandle(outlineHandle, outlineSidebar, 'left', 180, 600, 'viewerOutlineWidth');
+    setupResizeHandle(notesHandle, notesSidebar, 'right', 220, 900, 'viewerNotesWidth');
 }
 
 // side: which edge of the panel is fixed to the window edge — 'left' means
@@ -5114,4 +5115,411 @@ function setupEditFieldItemModalHandlers() {
 }
 
 window.addEventListener('DOMContentLoaded', initApp);
+
+// --- AI Legal Assistant Module ---
+
+function initAIAssistant() {
+    const tabNotes = document.getElementById('tab-btn-notes');
+    const tabAI = document.getElementById('tab-btn-ai');
+    const panelNotes = document.getElementById('panel-notes');
+    const panelAI = document.getElementById('panel-ai');
+
+    if (tabNotes && tabAI && panelNotes && panelAI) {
+        tabNotes.addEventListener('click', () => {
+            tabAI.classList.remove('active');
+            tabNotes.classList.add('active');
+            panelAI.style.display = 'none';
+            panelNotes.style.display = 'flex';
+        });
+
+        tabAI.addEventListener('click', () => {
+            tabNotes.classList.remove('active');
+            tabAI.classList.add('active');
+            panelNotes.style.display = 'none';
+            panelAI.style.display = 'flex';
+            
+            const chatHistory = document.getElementById('ai-chat-history');
+            if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
+        });
+    }
+
+    const apiSetupBtn = document.getElementById('ai-api-setup-btn');
+    const apiKeyPanel = document.getElementById('ai-api-key-panel');
+    if (apiSetupBtn && apiKeyPanel) {
+        apiSetupBtn.addEventListener('click', () => {
+            const isHidden = apiKeyPanel.style.display === 'none';
+            apiKeyPanel.style.display = isHidden ? 'flex' : 'none';
+        });
+    }
+
+    const saveKeyBtn = document.getElementById('ai-save-key-btn');
+    const keyInput = document.getElementById('ai-gemini-key-input');
+    const modelSelect = document.getElementById('ai-gemini-model-select');
+    const versionSelect = document.getElementById('ai-gemini-version-select');
+
+    if (saveKeyBtn && keyInput) {
+        const savedKey = localStorage.getItem('legaldoc_gemini_api_key') || '';
+        keyInput.value = savedKey;
+        updateAIStatusUI(savedKey);
+
+        if (modelSelect) {
+            modelSelect.value = localStorage.getItem('legaldoc_gemini_model') || 'gemini-1.5-flash';
+        }
+        if (versionSelect) {
+            versionSelect.value = localStorage.getItem('legaldoc_gemini_api_version') || 'v1';
+            
+            versionSelect.addEventListener('change', () => {
+                localStorage.setItem('legaldoc_gemini_api_version', versionSelect.value);
+                const currentKey = keyInput.value.trim();
+                if (currentKey) {
+                    fetchAndPopulateModels(currentKey);
+                }
+            });
+        }
+
+        // Fetch models list immediately if key exists
+        if (savedKey) {
+            fetchAndPopulateModels(savedKey);
+        }
+
+        saveKeyBtn.addEventListener('click', async () => {
+            const key = keyInput.value.trim();
+            localStorage.setItem('legaldoc_gemini_api_key', key);
+            
+            if (versionSelect) {
+                localStorage.setItem('legaldoc_gemini_api_version', versionSelect.value);
+            }
+            if (modelSelect && modelSelect.value) {
+                localStorage.setItem('legaldoc_gemini_model', modelSelect.value);
+            }
+
+            updateAIStatusUI(key);
+            
+            if (key) {
+                saveKeyBtn.disabled = true;
+                const originalText = saveKeyBtn.textContent;
+                saveKeyBtn.textContent = "Đang kết nối...";
+                
+                await fetchAndPopulateModels(key);
+                
+                saveKeyBtn.disabled = false;
+                saveKeyBtn.textContent = originalText;
+            }
+
+            apiKeyPanel.style.display = 'none';
+            alert("Đã lưu cấu hình API thành công!");
+        });
+    }
+
+    const summarizeBtn = document.getElementById('ai-summarize-btn');
+    if (summarizeBtn) {
+        summarizeBtn.addEventListener('click', async () => {
+            if (!state.currentDoc) {
+                alert("Vui lòng mở một văn bản trước khi thực hiện tóm tắt!");
+                return;
+            }
+
+            const key = localStorage.getItem('legaldoc_gemini_api_key');
+            if (!key) {
+                alert("Vui lòng cấu hình Gemini API Key trước!");
+                if (apiKeyPanel) apiKeyPanel.style.display = 'flex';
+                return;
+            }
+
+            summarizeBtn.disabled = true;
+            const originalText = summarizeBtn.innerHTML;
+            summarizeBtn.innerHTML = `<i data-lucide="loader" class="spin" style="width: 14px;"></i> Đang phân tích...`;
+            lucide.createIcons();
+
+            appendChatMessage('system', `🤖 <em>Đang gửi nội dung văn bản "${state.currentDoc.number || 'Không số hiệu'}" lên Gemini để phân tích...</em>`);
+
+            try {
+                const docText = getActiveDocumentText();
+                if (!docText) throw new Error("Văn bản này không có nội dung để tóm tắt.");
+
+                const systemInstruction = "Bạn là một Chuyên gia Pháp luật Việt Nam xuất sắc. Hãy tóm tắt văn bản pháp luật được cung cấp một cách ngắn gọn, rõ ràng bằng tiếng Việt. Sử dụng định dạng markdown đẹp mắt (in đậm, danh sách gạch đầu dòng).";
+                const prompt = `Hãy tóm tắt văn bản pháp luật sau đây. Nêu rõ mục đích ban hành, các điểm mới/quan trọng, đối tượng chịu ảnh hưởng lớn nhất, và thời hiệu thi hành (nếu có).\n\nTên văn bản: ${state.currentDoc.title}\nSố hiệu: ${state.currentDoc.number || 'N/A'}\nNgày ban hành: ${state.currentDoc.issueDate || 'N/A'}\n\nNỘI DUNG VĂN BẢN:\n${docText.substring(0, 150000)}`;
+
+                const responseText = await callGeminiAPI(prompt, systemInstruction);
+                appendChatMessage('ai', responseText);
+            } catch (err) {
+                console.error("Lỗi tóm tắt AI:", err);
+                appendChatMessage('error', `❌ Lỗi tóm tắt văn bản: ${err.message}`);
+            } finally {
+                summarizeBtn.disabled = false;
+                summarizeBtn.innerHTML = originalText;
+                lucide.createIcons();
+            }
+        });
+    }
+
+    const sendChatBtn = document.getElementById('ai-chat-send-btn');
+    const chatInput = document.getElementById('ai-chat-input');
+    if (sendChatBtn && chatInput) {
+        const handleSend = async () => {
+            const question = chatInput.value.trim();
+            if (!question) return;
+
+            if (!state.currentDoc) {
+                alert("Vui lòng mở một văn bản pháp luật để đặt câu hỏi!");
+                return;
+            }
+
+            const key = localStorage.getItem('legaldoc_gemini_api_key');
+            if (!key) {
+                alert("Vui lòng cấu hình Gemini API Key trước!");
+                if (apiKeyPanel) apiKeyPanel.style.display = 'flex';
+                return;
+            }
+
+            chatInput.value = '';
+            chatInput.style.height = '32px';
+            
+            appendChatMessage('user', question);
+            appendChatMessage('system', `🤖 <em>Trợ lý AI đang nghiên cứu tài liệu để trả lời...</em>`);
+
+            try {
+                const docText = getActiveDocumentText();
+                const systemInstruction = `Bạn là một Chuyên gia Pháp luật Việt Nam xuất sắc. Hãy trả lời câu hỏi của người dùng một cách trung thực, chính xác dựa trên nội dung văn bản pháp luật được cung cấp. Luôn trích dẫn rõ Điều/Khoản trong văn bản làm cơ sở pháp lý. Trả lời bằng tiếng Việt, định dạng markdown sạch đẹp.`;
+                const prompt = `NỘI DUNG VĂN BẢN PHÁP LUẬT:\n${docText.substring(0, 150000)}\n\nCÂU HỎI CỦA NGƯỜI DÙNG:\n${question}`;
+
+                const responseText = await callGeminiAPI(prompt, systemInstruction);
+                
+                const chatHistory = document.getElementById('ai-chat-history');
+                const lastMsg = chatHistory.lastChild;
+                if (lastMsg && lastMsg.classList.contains('system')) {
+                    chatHistory.removeChild(lastMsg);
+                }
+
+                appendChatMessage('ai', responseText);
+            } catch (err) {
+                console.error("Lỗi trò chuyện AI:", err);
+                appendChatMessage('error', `❌ Lỗi trả lời: ${err.message}`);
+            }
+        };
+
+        sendChatBtn.addEventListener('click', handleSend);
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+            }
+        });
+
+        chatInput.addEventListener('input', () => {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
+        });
+    }
+}
+
+function updateAIStatusUI(key) {
+    const statusText = document.getElementById('ai-api-status-text');
+    if (!statusText) return;
+
+    if (key) {
+        statusText.textContent = "Sẵn sàng (Đã kết nối)";
+        statusText.style.color = "#10b981";
+    } else {
+        statusText.textContent = "Chưa có API Key";
+        statusText.style.color = "var(--danger-color)";
+    }
+}
+async function fetchAndPopulateModels(key) {
+    const modelSelect = document.getElementById('ai-gemini-model-select');
+    if (!modelSelect || !key) return;
+    
+    const apiVersion = localStorage.getItem('legaldoc_gemini_api_version') || 'v1';
+    const url = `https://generativelanguage.googleapis.com/${apiVersion}/models?key=${key}`;
+    
+    try {
+        const res = await fetch(url);
+        if (!res.ok) {
+            console.warn("Không thể lấy danh sách model, mã lỗi:", res.status);
+            return;
+        }
+        const data = await res.json();
+        if (data.models && data.models.length > 0) {
+            const validModels = data.models.filter(m => 
+                m.supportedGenerationMethods && 
+                m.supportedGenerationMethods.includes('generateContent') &&
+                !m.name.includes('gemini-2.5-flash')
+            );
+            
+            if (validModels.length > 0) {
+                const savedModel = localStorage.getItem('legaldoc_gemini_model') || 'gemini-1.5-flash';
+                modelSelect.innerHTML = '';
+                
+                validModels.forEach(m => {
+                    const shortName = m.name.replace('models/', '');
+                    const opt = document.createElement('option');
+                    opt.value = shortName;
+                    opt.textContent = `${m.displayName || shortName} (${shortName})`;
+                    modelSelect.appendChild(opt);
+                });
+                
+                let indexToSelect = 0;
+                const savedIdx = validModels.findIndex(m => m.name.replace('models/', '') === savedModel);
+                if (savedIdx !== -1) {
+                    indexToSelect = savedIdx;
+                } else {
+                    const flash35Idx = validModels.findIndex(m => m.name.includes('gemini-3.5-flash'));
+                    if (flash35Idx !== -1) {
+                        indexToSelect = flash35Idx;
+                    } else {
+                        const flash31Idx = validModels.findIndex(m => m.name.includes('gemini-3.1-flash'));
+                        if (flash31Idx !== -1) {
+                            indexToSelect = flash31Idx;
+                        } else {
+                            const flash15Idx = validModels.findIndex(m => m.name.includes('gemini-1.5-flash'));
+                            if (flash15Idx !== -1) {
+                                indexToSelect = flash15Idx;
+                            } else {
+                                const flash20Idx = validModels.findIndex(m => m.name.includes('gemini-2.0-flash'));
+                                if (flash20Idx !== -1) {
+                                    indexToSelect = flash20Idx;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                modelSelect.selectedIndex = indexToSelect;
+                localStorage.setItem('legaldoc_gemini_model', modelSelect.value);
+            }
+        }
+    } catch (e) {
+        console.error("Lỗi khi tải danh sách model từ API:", e);
+    }
+}
+
+async function callGeminiAPI(prompt, systemInstruction) {
+    const key = localStorage.getItem('legaldoc_gemini_api_key');
+    if (!key) throw new Error("API Key chưa được cấu hình!");
+
+    const model = localStorage.getItem('legaldoc_gemini_model') || 'gemini-1.5-flash';
+    const apiVersion = localStorage.getItem('legaldoc_gemini_api_version') || 'v1';
+    
+    const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${key}`;
+    
+    let finalPrompt = prompt;
+    if (systemInstruction) {
+        finalPrompt = `[CHỈ DẪN HỆ THỐNG: ${systemInstruction}]\n\n[Nhiệm vụ]: ${prompt}`;
+    }
+
+    const requestBody = {
+        contents: [
+            {
+                parts: [
+                    { text: finalPrompt }
+                ]
+            }
+        ]
+    };
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `HTTP error ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+function getActiveDocumentText() {
+    if (!state.currentDoc || !state.currentDoc.parsedHtml) return '';
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = state.currentDoc.parsedHtml;
+    return tempDiv.textContent || tempDiv.innerText || '';
+}
+
+function appendChatMessage(role, text) {
+    const chatHistory = document.getElementById('ai-chat-history');
+    const emptyMsg = document.getElementById('ai-chat-empty-msg');
+    if (!chatHistory) return;
+
+    if (emptyMsg) emptyMsg.style.display = 'none';
+
+    if (role === 'error') {
+        const lastMsg = chatHistory.lastChild;
+        if (lastMsg && lastMsg.classList.contains('system')) {
+            chatHistory.removeChild(lastMsg);
+        }
+    }
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `ai-message ${role}`;
+    
+    if (role === 'ai') {
+        msgDiv.innerHTML = parseMarkdownToHtml(text);
+    } else if (role === 'user') {
+        msgDiv.textContent = text;
+    } else {
+        msgDiv.innerHTML = text;
+    }
+    
+    chatHistory.appendChild(msgDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function parseMarkdownToHtml(md) {
+    if (!md) return '';
+    let html = escapeHtml(md);
+    
+    html = html.replace(/^### (.*$)/gim, '<h5 style="margin: 0.5rem 0 0.25rem; font-weight: 700; color: var(--primary-color); font-size: 0.8rem;">$1</h5>');
+    html = html.replace(/^## (.*$)/gim, '<h4 style="margin: 0.6rem 0 0.3rem; font-weight: 700; color: var(--primary-color); font-size: 0.85rem;">$1</h4>');
+    html = html.replace(/^# (.*$)/gim, '<h3 style="margin: 0.75rem 0 0.4rem; font-weight: 700; color: var(--primary-color); font-size: 0.9rem;">$1</h3>');
+    
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    const lines = html.split('\n');
+    let inList = false;
+    let listType = '';
+    const processedLines = [];
+    
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+            if (!inList || listType !== 'ul') {
+                if (inList) processedLines.push(listType === 'ul' ? '</ul>' : '</ol>');
+                processedLines.push('<ul style="margin: 0.35rem 0; padding-left: 1.25rem;">');
+                inList = true;
+                listType = 'ul';
+            }
+            processedLines.push(`<li style="margin-bottom: 0.15rem;">${trimmed.substring(2)}</li>`);
+        } else if (trimmed.match(/^\d+\.\s/)) {
+            if (!inList || listType !== 'ol') {
+                if (inList) processedLines.push(listType === 'ul' ? '</ul>' : '</ol>');
+                processedLines.push('<ol style="margin: 0.35rem 0; padding-left: 1.25rem;">');
+                inList = true;
+                listType = 'ol';
+            }
+            const match = trimmed.match(/^\d+\.\s(.*)/);
+            processedLines.push(`<li style="margin-bottom: 0.15rem;">${match[1]}</li>`);
+        } else {
+            if (inList) {
+                processedLines.push(listType === 'ul' ? '</ul>' : '</ol>');
+                inList = false;
+                listType = '';
+            }
+            if (trimmed.length > 0) {
+                processedLines.push(`<p style="margin: 0.35rem 0;">${trimmed}</p>`);
+            }
+        }
+    });
+    
+    if (inList) {
+        processedLines.push(listType === 'ul' ? '</ul>' : '</ol>');
+    }
+    
+    return processedLines.join('\n');
+}
 

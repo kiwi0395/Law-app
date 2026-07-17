@@ -805,11 +805,13 @@ body {
 }
 
 .resize-handle {
-    width: 5px;
+    width: 10px;
+    margin: 0 -5px;
     flex-shrink: 0;
     cursor: col-resize;
     background: transparent;
     position: relative;
+    z-index: 99999 !important;
 }
 
 .resize-handle::after {
@@ -2298,6 +2300,98 @@ del {
     .doc-edit-two-columns {
         flex-direction: column !important;
     }
+}
+
+
+/* --- AI Assistant Sidebar Panel & Tabs --- */
+.notes-sidebar-tab {
+    transition: all 0.2s ease;
+    border-bottom: 2px solid transparent !important;
+}
+
+.notes-sidebar-tab:hover {
+    color: var(--text-main) !important;
+    background: rgba(255,255,255,0.02) !important;
+}
+
+.notes-sidebar-tab.active {
+    color: var(--primary-color) !important;
+    border-bottom-color: var(--primary-color) !important;
+    background: rgba(255,255,255,0.04) !important;
+}
+
+[data-theme="light"] .notes-sidebar-tab.active {
+    background: rgba(0,0,0,0.03) !important;
+}
+
+/* Chat Messages Styling */
+.ai-message {
+    padding: 0.5rem 0.65rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    max-width: 90%;
+    word-wrap: break-word;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.ai-message.user {
+    align-self: flex-end;
+    background: var(--primary-color);
+    color: #ffffff !important;
+    border-bottom-right-radius: 2px;
+}
+
+.ai-message.ai {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.04);
+    border: var(--glass-border);
+    color: var(--text-main);
+    border-bottom-left-radius: 2px;
+}
+
+[data-theme="light"] .ai-message.ai {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.ai-message.system {
+    align-self: center;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.7rem;
+    text-align: center;
+    max-width: 100%;
+}
+
+.ai-message.error {
+    align-self: center;
+    background: rgba(239, 68, 68, 0.08);
+    color: var(--danger-color);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    font-size: 0.7rem;
+    text-align: center;
+    max-width: 100%;
+}
+
+.ai-message p {
+    margin: 0;
+}
+
+.ai-message ul, .ai-message ol {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.ai-message li {
+    margin-bottom: 0.15rem;
+}
+
+.ai-message strong {
+    color: inherit;
 }
 
 
