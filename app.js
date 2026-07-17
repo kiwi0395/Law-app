@@ -316,6 +316,7 @@ const elements = {
     viewerSearchInput: document.getElementById('viewer-search-input'),
     viewerZoomIn: document.getElementById('viewer-zoom-in'),
     viewerZoomOut: document.getElementById('viewer-zoom-out'),
+    viewerPrintBtn: document.getElementById('viewer-print-btn'),
     viewerPaperContent: document.getElementById('viewer-paper-content'),
     viewerNotesList: document.getElementById('viewer-notes-list'),
 
@@ -442,10 +443,25 @@ async function exportBackup() {
         db.getAllDocuments(), db.getAllNotes(), db.getAllRelations()
     ]);
 
-    // Serialize any attached blobs into base64 data URLs
+    // Serialize any attached blobs into base64 data URLs safely
     for (const d of documents) {
-        d.pdfBlob = (d.pdfBlob instanceof Blob) ? { __blob: true, dataUrl: await blobToDataUrl(d.pdfBlob) } : null;
-        d.wordBlob = (d.wordBlob instanceof Blob) ? { __blob: true, dataUrl: await blobToDataUrl(d.wordBlob) } : null;
+        try {
+            d.pdfBlob = (d.pdfBlob && (d.pdfBlob instanceof Blob || (typeof d.pdfBlob === 'object' && typeof d.pdfBlob.size === 'number'))) 
+                ? { __blob: true, dataUrl: await blobToDataUrl(d.pdfBlob) } 
+                : null;
+        } catch (err) {
+            console.warn(`Không thể chuyển đổi pdfBlob cho tài liệu ${d.id}:`, err);
+            d.pdfBlob = null;
+        }
+
+        try {
+            d.wordBlob = (d.wordBlob && (d.wordBlob instanceof Blob || (typeof d.wordBlob === 'object' && typeof d.wordBlob.size === 'number'))) 
+                ? { __blob: true, dataUrl: await blobToDataUrl(d.wordBlob) } 
+                : null;
+        } catch (err) {
+            console.warn(`Không thể chuyển đổi wordBlob cho tài liệu ${d.id}:`, err);
+            d.wordBlob = null;
+        }
     }
 
     const payload = {
@@ -2364,6 +2380,16 @@ function setupViewerHandlers() {
         if (splitBody) splitBody.style.fontSize = `${14 * (state.zoomLevel / 100)}px`;
     });
 
+    if (elements.viewerPrintBtn) {
+        elements.viewerPrintBtn.addEventListener('click', () => {
+            if (!state.currentDoc) {
+                alert("Vui lòng mở một văn bản trước khi thực hiện in/xuất PDF!");
+                return;
+            }
+            window.print();
+        });
+    }
+
     // Split screen buttons listeners
     const splitBtn = document.getElementById('viewer-split-btn');
     const splitClose = document.getElementById('close-split-pane-btn');
@@ -3633,6 +3659,28 @@ function setupRelationsHandlers() {
     window.addEventListener('mouseup', () => {
         relIsDragging = false;
     });
+
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        const zoomFactor = 0.08;
+        const previousZoom = relZoom;
+        
+        if (e.deltaY < 0) {
+            relZoom = Math.min(relZoom + zoomFactor, 2.5);
+        } else {
+            relZoom = Math.max(relZoom - zoomFactor, 0.3);
+        }
+        
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        relPanX = mouseX - (mouseX - relPanX) * (relZoom / previousZoom);
+        relPanY = mouseY - (mouseY - relPanY) * (relZoom / previousZoom);
+        
+        applyRelationsTransform();
+    }, { passive: false });
     
     // Đăng ký sự kiện cảm ứng trên di động
     if (typeof setupSvgTouchEvents === 'function') {

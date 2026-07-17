@@ -2112,6 +2112,7 @@ del {
     margin-bottom: 0.5rem;
     overflow: hidden;
     transition: all 0.2s ease;
+    flex-shrink: 0;
 }
 
 [data-theme="light"] .fields-tree-group {
@@ -2218,6 +2219,7 @@ del {
     margin-top: 1rem;
     border-top: 1px dashed var(--border-color);
     padding-top: 1rem;
+    flex-shrink: 0;
 }
 
 .fields-tree-standalone-title {
@@ -2229,6 +2231,10 @@ del {
     letter-spacing: 0.5px;
 }
 
+.fields-list-card:hover {
+    transform: none !important;
+}
+
 @media (max-width: 992px) {
     .fields-mgmt-container {
         grid-template-columns: 1fr !important;
@@ -2236,8 +2242,8 @@ del {
         height: auto !important;
     }
     .fields-list-card {
-        height: auto !important;
-        max-height: 500px;
+        height: 600px !important;
+        max-height: 85vh !important;
     }
 }
 
@@ -2396,4 +2402,96 @@ del {
 
 
 
+/* --- Print & PDF Export Stylesheet --- */
+@media print {
+    /* Hide all browser/app UI components */
+    header, 
+    nav,
+    aside,
+    .resize-handle,
+    .viewer-tabs,
+    .document-toolbar,
+    .viewer-expired-banner,
+    .rel-modal-overlay,
+    .edit-field-item-modal,
+    #mobile-sidebar-backdrop,
+    #sync-status-indicator {
+        display: none !important;
+        visibility: hidden !important;
+    }
 
+    /* Force body and all layout containers to auto height and visible overflow for multi-page printing */
+    html, 
+    body, 
+    main, 
+    .app-container, 
+    #viewer-page, 
+    .viewer-layout, 
+    #viewer-scroller-layout,
+    #viewer-column-main {
+        background: #ffffff !important;
+        color: #000000 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Clean legal formatting for the printed A4 paper box */
+    .a4-paper {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-family: "Times New Roman", Times, serif !important;
+        line-height: 1.4 !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+
+    /* Print Font Sizing - Smaller & compact */
+    .a4-paper p, 
+    .a4-paper span, 
+    .a4-paper li,
+    .a4-paper td {
+        font-size: 9.5pt !important;
+        color: #000000 !important;
+    }
+
+    .a4-paper h1 { font-size: 12pt !important; }
+    .a4-paper h2 { font-size: 11.5pt !important; }
+    .a4-paper h3 { font-size: 11pt !important; }
+    .a4-paper h4, .a4-paper h5, .a4-paper h6 { font-size: 10pt !important; }
+
+    /* Page breaks protection */
+    .a4-paper p, 
+    .a4-paper h1, 
+    .a4-paper h2, 
+    .a4-paper h3, 
+    .a4-paper h4, 
+    .a4-paper h5, 
+    .a4-paper h6,
+    .a4-paper li {
+        page-break-inside: avoid;
+    }
+
+    .a4-paper h1, 
+    .a4-paper h2, 
+    .a4-paper h3 {
+        page-break-after: avoid;
+        color: #000000 !important;
+        margin-top: 1.25rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+}

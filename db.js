@@ -158,6 +158,10 @@ class LegalDB {
 
     getAllDocuments() {
         return new Promise((resolve, reject) => {
+            if (!this.db || !this.db.objectStoreNames.contains('documents')) {
+                resolve([]);
+                return;
+            }
             const transaction = this.db.transaction(['documents'], 'readonly');
             const store = transaction.objectStore('documents');
             const request = store.getAll();
@@ -414,6 +418,10 @@ class LegalDB {
 
     getAllNotes() {
         return new Promise((resolve, reject) => {
+            if (!this.db || !this.db.objectStoreNames.contains('notes')) {
+                resolve([]);
+                return;
+            }
             const transaction = this.db.transaction(['notes'], 'readonly');
             const store = transaction.objectStore('notes');
             const request = store.getAll();
@@ -481,6 +489,10 @@ class LegalDB {
 
     getAllRelations() {
         return new Promise((resolve, reject) => {
+            if (!this.db || !this.db.objectStoreNames.contains('relations')) {
+                resolve([]);
+                return;
+            }
             const transaction = this.db.transaction(['relations'], 'readonly');
             const store = transaction.objectStore('relations');
             const request = store.getAll();
