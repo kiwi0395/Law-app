@@ -924,6 +924,20 @@
             </select>
         </div>
 
+        <!-- Quick Reference Helper -->
+        <div style="border: 1px dashed var(--border-color); border-radius: 8px; padding: 0.5rem; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.15rem;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: var(--primary-color); display: flex; align-items: center; gap: 0.25rem;">
+                <i data-lucide="link" style="width: 12px;"></i> Chèn nhanh liên kết văn bản khác
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+                <select id="popover-quick-ref-doc" class="filter-select" style="flex: 1.5; min-width: 0; padding: 0.15rem 0.3rem; font-size: 0.72rem; height: 26px;">
+                    <option value="">-- Chọn văn bản --</option>
+                </select>
+                <input type="text" id="popover-quick-ref-anchor" class="form-input" placeholder="Ví dụ: Điều 3" style="flex: 1; min-width: 0; padding: 0.15rem 0.3rem; font-size: 0.72rem; height: 26px;">
+                <button type="button" class="btn-primary" id="popover-quick-ref-insert-btn" style="width: auto; font-size: 0.7rem; padding: 0 0.4rem; height: 26px; border-radius: 4px; background: var(--success-color); border-color: var(--success-color);" title="Chèn liên kết vào ghi chú">Chèn</button>
+            </div>
+        </div>
+
         <textarea id="popover-note-text" rows="3" placeholder="Nhập ghi chú giải trình (không bắt buộc). Có thể dán link để bấm mở trực tiếp." style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; padding: 0.5rem; resize: none; font-size: 0.85rem;"></textarea>
         <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
             <button class="action-btn" id="popover-close-btn" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Hủy</button>

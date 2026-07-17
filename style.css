@@ -1349,7 +1349,7 @@ del {
 /* Tooltip for Note Popover */
 .note-popover {
     position: absolute;
-    background: var(--bg-card);
+    background: #1e293b;
     border: var(--glass-border);
     box-shadow: 0 10px 25px rgba(0,0,0,0.3);
     border-radius: 8px;
@@ -1359,6 +1359,10 @@ del {
     flex-direction: column;
     gap: 0.5rem;
     width: 250px;
+}
+
+[data-theme="light"] .note-popover {
+    background: #ffffff;
 }
 
 .note-popover textarea {

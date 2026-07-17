@@ -2752,6 +2752,43 @@ function setupViewerHandlers() {
         window.getSelection().removeAllRanges();
     });
 
+    const quickRefInsertBtn = document.getElementById('popover-quick-ref-insert-btn');
+    if (quickRefInsertBtn) {
+        quickRefInsertBtn.addEventListener('click', () => {
+            const docId = document.getElementById('popover-quick-ref-doc').value;
+            const anchor = document.getElementById('popover-quick-ref-anchor').value.trim();
+            const noteTextarea = elements.popoverNoteText;
+            
+            if (!docId) {
+                alert("Vui lòng chọn văn bản tham chiếu!");
+                return;
+            }
+            
+            const selectedDoc = state.documents.find(d => d.id === Number(docId));
+            if (!selectedDoc) return;
+            
+            const docName = selectedDoc.number || selectedDoc.title;
+            const linkText = anchor ? `${anchor} ${docName}` : docName;
+            const refLink = `[${linkText}](app://doc/${docId}${anchor ? '#' + encodeURIComponent(anchor) : ''})`;
+            
+            const startPos = noteTextarea.selectionStart;
+            const endPos = noteTextarea.selectionEnd;
+            const text = noteTextarea.value;
+            
+            if (startPos !== undefined) {
+                noteTextarea.value = text.substring(0, startPos) + refLink + text.substring(endPos, text.length);
+                noteTextarea.focus();
+                noteTextarea.selectionStart = startPos + refLink.length;
+                noteTextarea.selectionEnd = startPos + refLink.length;
+            } else {
+                noteTextarea.value += (noteTextarea.value ? ' ' : '') + refLink;
+            }
+            
+            document.getElementById('popover-quick-ref-anchor').value = '';
+            document.getElementById('popover-quick-ref-doc').value = '';
+        });
+    }
+
     elements.popoverSaveBtn.addEventListener('click', async () => {
         const noteType = noteTypeSelect.value;
         const supplementalText = document.getElementById('popover-supplemental-text').value.trim();
@@ -2850,6 +2887,12 @@ function handleTextSelection(e) {
                 // Populate reference doc dropdown dynamically
                 const refDocSelect = document.getElementById('popover-ref-doc');
                 refDocSelect.innerHTML = '<option value="">-- Chọn văn bản dẫn chiếu --</option>';
+                
+                const quickRefDocSelect = document.getElementById('popover-quick-ref-doc');
+                if (quickRefDocSelect) {
+                    quickRefDocSelect.innerHTML = '<option value="">-- Chọn văn bản --</option>';
+                }
+
                 sortDocsByIssueDate(state.documents).forEach(doc => {
                     if (doc.id !== docId) {
                         const opt = document.createElement('option');
@@ -2857,7 +2900,21 @@ function handleTextSelection(e) {
                         opt.textContent = `${doc.number ? doc.number + ' - ' : ''}${doc.title}`;
                         refDocSelect.appendChild(opt);
                     }
+                    if (quickRefDocSelect) {
+                        const opt = document.createElement('option');
+                        opt.value = doc.id;
+                        opt.textContent = `${doc.number ? doc.number + ' - ' : ''}${doc.title}`;
+                        quickRefDocSelect.appendChild(opt);
+                    }
                 });
+
+                if (quickRefDocSelect) {
+                    quickRefDocSelect.value = '';
+                }
+                const quickRefAnchorInput = document.getElementById('popover-quick-ref-anchor');
+                if (quickRefAnchorInput) {
+                    quickRefAnchorInput.value = '';
+                }
 
                 elements.popoverPreview.textContent = selectedText.substring(0, 30) + (selectedText.length > 30 ? '...' : '');
                 
@@ -3333,16 +3390,83 @@ function escapeHtml(text) {
 // read-only note rendering so a pasted link can be clicked directly.
 function linkifyText(text) {
     if (!text) return '';
-    const escaped = escapeHtml(text);
-    return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
-        // Trim trailing punctuation that's likely sentence punctuation, not part of the URL
+    let escaped = escapeHtml(text);
+
+    // 1. First, parse markdown links: [Link text](url) where url is http(s):// or app://
+    escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s<)]+|app:\/\/doc\/\d+[^\s<)]*)\)/g, (match, linkText, url) => {
+        if (url.startsWith('app://doc/')) {
+            const urlParts = url.replace('app://doc/', '').split('#');
+            const docId = urlParts[0];
+            const anchor = urlParts[1] || '';
+            return `<a href="#" class="note-internal-link" data-doc-id="${docId}" data-anchor="${escapeHtml(anchor)}">${linkText}</a>`;
+        } else {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="note-link">${linkText}</a>`;
+        }
+    });
+
+    // 2. Then, parse raw http(s) URLs
+    escaped = escaped.replace(/(?<!href=")(https?:\/\/[^\s<]+)/g, (url) => {
         const trailingMatch = url.match(/[).,;:!?]+$/);
         const trailing = trailingMatch ? trailingMatch[0] : '';
         const cleanUrl = trailing ? url.slice(0, -trailing.length) : url;
         if (!cleanUrl) return url;
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="note-link">${cleanUrl}</a>${trailing}`;
     });
+
+    // 3. Parse raw app://doc/ URLs
+    escaped = escaped.replace(/(?<!href=")(app:\/\/doc\/(\d+)(?:#([^\s<]*))?)/g, (match, url, docId, anchor) => {
+        const cleanAnchor = anchor ? anchor.replace(/%20/g, ' ') : '';
+        const otherDoc = state.documents.find(d => d.id === Number(docId));
+        const displayName = otherDoc ? (otherDoc.number || otherDoc.title) : `Văn bản #${docId}`;
+        const suffix = cleanAnchor ? ` - ${cleanAnchor}` : '';
+        return `<a href="#" class="note-internal-link" data-doc-id="${docId}" data-anchor="${escapeHtml(cleanAnchor)}">${escapeHtml(displayName)}${escapeHtml(suffix)}</a>`;
+    });
+
+    return escaped;
 }
+
+function scrollToAnchorInViewer(anchor) {
+    if (!anchor) return;
+    
+    const cleanAnchor = decodeURIComponent(anchor).trim().toLowerCase();
+    let container = elements.viewerPaperContent;
+    
+    const allEl = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, .detected-heading');
+    for (const el of allEl) {
+        const text = el.textContent.trim().toLowerCase();
+        if (text.startsWith(cleanAnchor) || text.includes(cleanAnchor)) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            const originalBg = el.style.backgroundColor;
+            el.style.backgroundColor = 'rgba(251, 191, 36, 0.4)';
+            el.style.transition = 'background-color 0.5s ease';
+            setTimeout(() => {
+                el.style.backgroundColor = originalBg;
+            }, 2500);
+            
+            break;
+        }
+    }
+}
+
+document.body.addEventListener('click', (e) => {
+    const internalLink = e.target.closest('.note-internal-link');
+    if (internalLink) {
+        e.preventDefault();
+        const docId = Number(internalLink.getAttribute('data-doc-id'));
+        const anchor = internalLink.getAttribute('data-anchor');
+        
+        if (docId) {
+            openDocumentInViewer(docId).then(() => {
+                if (anchor) {
+                    setTimeout(() => {
+                        scrollToAnchorInViewer(anchor);
+                    }, 350);
+                }
+            });
+        }
+    }
+});
 
 // Renders the "đoạn văn bản bổ sung" content: escapes HTML + linkifies URLs
 // (via linkifyText) AND preserves the pasted paragraphs/line breaks, so text
