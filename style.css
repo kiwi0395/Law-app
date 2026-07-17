@@ -2286,5 +2286,16 @@ del {
     transform: scale(0.9);
 }
 
+/* --- Edit Modal Two Column Layout --- */
+@media (max-width: 768px) {
+    .doc-edit-divider {
+        display: none !important;
+    }
+    .doc-edit-two-columns {
+        flex-direction: column !important;
+    }
+}
+
+
 
 

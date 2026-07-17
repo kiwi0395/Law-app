@@ -1100,6 +1100,20 @@ function setupDocEditHandlers() {
             return;
         }
 
+        const number = document.getElementById('doc-edit-number').value.trim();
+        const issueDate = document.getElementById('doc-edit-issue-date').value.trim();
+        if (number) {
+            const duplicate = state.documents.find(d => 
+                d.id !== id &&
+                d.number && d.number.toLowerCase() === number.toLowerCase() && 
+                d.issueDate === issueDate
+            );
+            if (duplicate) {
+                const confirmSave = confirm(`CẢNH BÁO: Đã tồn tại một văn bản khác tên là "${duplicate.title}" có cùng Số hiệu (${number}) và Ngày ban hành (${issueDate}).\n\nBạn có chắc chắn muốn lưu thay đổi trùng lặp này không?`);
+                if (!confirmSave) return;
+            }
+        }
+
         await db.updateDocument(id, {
             title: title,
             number: document.getElementById('doc-edit-number').value.trim(),
@@ -1120,6 +1134,38 @@ function setupDocEditHandlers() {
             await openDocumentInViewer(id);
         }
     });
+
+    const relAddBtn = document.getElementById('doc-edit-rel-add-btn');
+    if (relAddBtn) {
+        relAddBtn.addEventListener('click', async () => {
+            const id = Number(overlay.getAttribute('data-editing-id'));
+            const targetId = document.getElementById('doc-edit-rel-target').value;
+            const relType = document.getElementById('doc-edit-rel-type').value;
+            const relNote = document.getElementById('doc-edit-rel-note').value.trim();
+
+            if (!targetId) {
+                alert("Vui lòng chọn văn bản để liên kết!");
+                return;
+            }
+
+            await db.addRelation({
+                sourceDocId: id,
+                targetDocId: Number(targetId),
+                relationType: relType,
+                note: relNote
+            });
+
+            document.getElementById('doc-edit-rel-target').value = '';
+            document.getElementById('doc-edit-rel-note').value = '';
+
+            state.relations = await db.getAllRelations();
+            await renderDocEditRelations(id);
+
+            if (state.activePage === 'relations-page') {
+                renderRelationsDiagram();
+            }
+        });
+    }
 }
 
 async function openDocEditModal(id) {
@@ -1140,7 +1186,88 @@ async function openDocEditModal(id) {
     updateAuthorityGroupVisibility('doc-edit-authority-group', doc.docType);
     setAuthorityValue('doc-edit-authority-category', 'doc-edit-authority-province', 'doc-edit-authority-custom', doc.issuingAuthority || '');
 
+    // Populate relations target dropdown and load existing relations
+    populateDocEditRelTarget(id);
+    await renderDocEditRelations(id);
+
     overlay.style.display = 'flex';
+}
+
+function populateDocEditRelTarget(docId) {
+    const select = document.getElementById('doc-edit-rel-target');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">-- Chọn văn bản --</option>';
+    const otherDocs = sortDocsByIssueDate(state.documents.filter(d => d.id !== docId));
+    
+    otherDocs.forEach(doc => {
+        const opt = document.createElement('option');
+        opt.value = doc.id;
+        opt.textContent = `${doc.number ? doc.number + ' - ' : ''}${doc.title}`;
+        select.appendChild(opt);
+    });
+}
+
+async function renderDocEditRelations(docId) {
+    const listContainer = document.getElementById('doc-edit-relations-list');
+    const countBadge = document.getElementById('doc-edit-rel-count');
+    if (!listContainer || !countBadge) return;
+
+    listContainer.innerHTML = '';
+    
+    const docRelations = state.relations.filter(r => r.sourceDocId === docId || r.targetDocId === docId);
+    countBadge.textContent = docRelations.length;
+
+    if (docRelations.length === 0) {
+        listContainer.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 1.5rem 0;">
+                Chưa có mối liên kết nào.
+            </div>
+        `;
+        return;
+    }
+
+    docRelations.forEach(rel => {
+        const isSource = rel.sourceDocId === docId;
+        const otherDocId = isSource ? rel.targetDocId : rel.sourceDocId;
+        const otherDoc = state.documents.find(d => d.id === otherDocId);
+        
+        const meta = RELATION_META[rel.relationType] || RELATION_META.huong_dan;
+        const directionLabel = isSource ? 'tác động lên' : 'được tác động bởi';
+        const otherDocName = otherDoc ? (otherDoc.number || otherDoc.title) : 'Văn bản đã xóa';
+        const tooltip = otherDoc ? `${otherDoc.number ? otherDoc.number + ' - ' : ''}${otherDoc.title}` : '';
+
+        const item = document.createElement('div');
+        item.style.cssText = 'background: rgba(255,255,255,0.03); border: var(--glass-border); border-radius: 6px; padding: 0.4rem 0.6rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem;';
+        
+        item.innerHTML = `
+            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${escapeHtml(tooltip)}">
+                <span class="rel-type-badge" style="background: ${meta.color}22; color: ${meta.color}; padding: 1px 4px; border-radius: 4px; font-size: 0.65rem; font-weight: 600;">${meta.label}</span>
+                <span style="color: var(--text-muted); font-size: 0.7rem;">${directionLabel}</span>
+                <strong>${escapeHtml(otherDocName)}</strong>
+                ${rel.note ? `<div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ghi chú: ${escapeHtml(rel.note)}</div>` : ''}
+            </div>
+            <button class="action-btn delete-rel-btn-modal" data-rel-id="${rel.id}" style="width: 22px; height: 22px; padding: 2px; flex-shrink: 0;" title="Xóa liên kết">
+                <i data-lucide="trash-2" style="width: 12px; color: var(--danger-color);"></i>
+            </button>
+        `;
+
+        item.querySelector('.delete-rel-btn-modal').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (confirm("Xóa mối quan hệ liên kết này?")) {
+                await db.deleteRelation(rel.id);
+                state.relations = await db.getAllRelations();
+                await renderDocEditRelations(docId);
+                if (state.activePage === 'relations-page') {
+                    renderRelationsDiagram();
+                }
+            }
+        });
+
+        listContainer.appendChild(item);
+    });
+    
+    lucide.createIcons();
 }
 
 // --- Global Search Input ---
@@ -1319,6 +1446,19 @@ function setupUploadHandlers() {
 
         const relationRows = collectUploadRelationRows();
         if (relationRows === null) return;
+
+        const number = document.getElementById('doc-number').value.trim();
+        const issueDate = document.getElementById('doc-issue-date').value.trim();
+        if (number) {
+            const duplicate = state.documents.find(d => 
+                d.number && d.number.toLowerCase() === number.toLowerCase() && 
+                d.issueDate === issueDate
+            );
+            if (duplicate) {
+                const confirmAdd = confirm(`CẢNH BÁO: Đã tồn tại văn bản "${duplicate.title}" có cùng Số hiệu (${number}) và Ngày ban hành (${issueDate}).\n\nBạn có chắc chắn muốn lưu văn bản trùng lặp này không?`);
+                if (!confirmAdd) return;
+            }
+        }
 
         elements.submitDocBtn.disabled = true;
         elements.submitDocBtn.innerHTML = `<i data-lucide="loader" class="spin"></i> Đang xử lý...`;
