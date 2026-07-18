@@ -363,16 +363,16 @@
                     <div class="document-view-container">
                         <div class="viewer-tabs" id="viewer-tabs"></div>
                         <div class="document-toolbar">
-                            <div class="toolbar-group">
+                            <div class="toolbar-group" style="min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; gap: 0.5rem;">
                                 <button class="action-btn" id="toggle-outline-btn" title="Ẩn/hiện mục lục"><i data-lucide="panel-left" style="width: 18px;"></i></button>
-                                <span id="viewer-doc-title" style="font-weight: 600; font-size: 0.95rem; max-width: 450px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Chưa có văn bản nào đang mở</span>
+                                <span id="viewer-doc-title" style="font-weight: 600; font-size: 0.95rem; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1;">Chưa có văn bản nào đang mở</span>
                                 <span class="badge badge-blue" id="viewer-doc-badge" style="display: none;">Mới</span>
                                 <a id="viewer-source-link" href="#" target="_blank" rel="noopener noreferrer" class="badge badge-green" style="display: none; align-items: center; gap: 0.3rem; text-decoration: none; cursor: pointer;" title="Mở văn bản gốc trên trang nguồn">
                                     <i data-lucide="external-link" style="width: 12px;"></i> Xem online
                                 </a>
                             </div>
-                            <div class="toolbar-group" style="gap: 0.5rem;">
-                                <div class="search-bar" id="viewer-search-bar" style="width: 280px; height: 32px; padding: 0 0.4rem; gap: 0.3rem;">
+                            <div class="toolbar-group" style="gap: 0.4rem; flex-shrink: 0;">
+                                <div class="search-bar" id="viewer-search-bar" style="width: 180px; min-width: 80px; height: 32px; padding: 0 0.4rem; gap: 0.3rem; flex-shrink: 1;">
                                     <i data-lucide="search" style="width: 14px; color: var(--text-muted); flex-shrink: 0;"></i>
                                     <input type="text" id="viewer-search-input" placeholder="Tìm trong văn bản..." style="font-size: 0.8rem; flex: 1; min-width: 0;">
                                     <span id="search-counter" style="font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; display: none;">0/0</span>
@@ -384,7 +384,7 @@
                                 </div>
                                 <button class="action-btn" id="viewer-zoom-in" title="Phóng to chữ"><i data-lucide="zoom-in" style="width: 18px;"></i></button>
                                 <button class="action-btn" id="viewer-zoom-out" title="Thu nhỏ chữ"><i data-lucide="zoom-out" style="width: 18px;"></i></button>
-                                <button class="btn-primary" id="viewer-split-btn" style="width: auto; font-size: 0.8rem; padding: 0.4rem 0.8rem; height: 32px; background: var(--accent-color);"><i data-lucide="columns-2" style="width: 16px;"></i> Đọc song song</button>
+                                <button class="btn-primary" id="viewer-split-btn" style="width: auto; font-size: 0.8rem; padding: 0.4rem 0.6rem; height: 32px; background: var(--accent-color); white-space: nowrap; flex-shrink: 0;"><i data-lucide="columns-2" style="width: 16px;"></i> Song song</button>
                                 <button class="action-btn" id="open-snippet-compare-btn" title="So sánh đoạn văn bản (dán đoạn cũ/mới để đối chiếu)"><i data-lucide="diff" style="width: 18px;"></i></button>
                                 <button class="action-btn" id="viewer-print-btn" title="In / Xuất PDF"><i data-lucide="printer" style="width: 18px;"></i></button>
                                 <button class="action-btn" id="toggle-notes-btn" title="Ẩn/hiện ghi chú"><i data-lucide="panel-right" style="width: 18px;"></i></button>
