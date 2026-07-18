@@ -801,7 +801,7 @@ body {
 
 .outline-sidebar.collapsed,
 .notes-sidebar.collapsed {
-    display: none;
+    display: none !important;
 }
 
 .resize-handle {
