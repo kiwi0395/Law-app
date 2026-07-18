@@ -360,6 +360,7 @@ async function initApp() {
         setupBackupHandlers();
         setupEditFieldItemModalHandlers();
         initAIAssistant();
+        setupNotesPageHandlers();
 
         // Khởi tạo Google Drive Sync & Mobile Support
         if (typeof setupGDriveUIHandlers === 'function') {
@@ -410,9 +411,12 @@ async function reloadData() {
     populateKhacTable();
     populateCompareDropdowns();
     renderTimeline();
+    populateNotesPageDocFilter();
     if (state.activePage === 'relations-page') {
         populateRelationDocSelects();
         renderRelationsDiagram();
+    } else if (state.activePage === 'notes-page') {
+        populateNotesPageList();
     }
 
     // Tự động đồng bộ lên Drive
@@ -700,6 +704,7 @@ function switchPage(pageId) {
     if (pageId === 'relations-page') title = "Sơ đồ quan hệ văn bản";
     if (pageId === 'timeline-page') title = "Timeline hiệu lực văn bản";
     if (pageId === 'fields-page') title = "Cấu hình Lĩnh vực Quy định";
+    if (pageId === 'notes-page') title = "Tra cứu & Đọc ghi chú";
     elements.headerTitle.textContent = title;
 
     // Trigger page-specific loads
@@ -719,6 +724,9 @@ function switchPage(pageId) {
         renderTimeline();
     } else if (pageId === 'fields-page') {
         renderFieldsManagementUI();
+    } else if (pageId === 'notes-page') {
+        populateNotesPageDocFilter();
+        populateNotesPageList();
     }
 }
 
@@ -5571,5 +5579,224 @@ function parseMarkdownToHtml(md) {
     }
     
     return processedLines.join('\n');
+}
+
+// --- Notes Lookup & Search Page ---
+function setupNotesPageHandlers() {
+    const searchInput = document.getElementById('notes-filter-search');
+    const typeSelect = document.getElementById('notes-filter-type');
+    const docSelect = document.getElementById('notes-filter-doc');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            populateNotesPageList();
+        });
+    }
+
+    if (typeSelect) {
+        typeSelect.addEventListener('change', () => {
+            populateNotesPageList();
+        });
+    }
+
+    if (docSelect) {
+        docSelect.addEventListener('change', () => {
+            populateNotesPageList();
+        });
+    }
+}
+
+function populateNotesPageDocFilter() {
+    const select = document.getElementById('notes-filter-doc');
+    if (!select) return;
+    
+    const currentVal = select.value;
+    select.innerHTML = '<option value="all">Tất cả văn bản</option>';
+    
+    const sortedDocs = [...state.documents].sort((a, b) => {
+        const titleA = (a.number ? a.number + ' - ' : '') + a.title;
+        const titleB = (b.number ? b.number + ' - ' : '') + b.title;
+        return titleA.localeCompare(titleB, 'vi');
+    });
+
+    sortedDocs.forEach(doc => {
+        const option = document.createElement('option');
+        option.value = doc.id;
+        option.textContent = `${doc.number ? doc.number + ' - ' : ''}${doc.title}`;
+        select.appendChild(option);
+    });
+    
+    if (sortedDocs.some(d => String(d.id) === String(currentVal))) {
+        select.value = currentVal;
+    } else {
+        select.value = 'all';
+    }
+}
+
+async function populateNotesPageList() {
+    const listContainer = document.getElementById('notes-list-container');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 2rem 0;">Đang tải ghi chú...</div>';
+
+    let allNotes = [];
+    try {
+        allNotes = await db.getAllNotes();
+    } catch (e) {
+        console.error("Lỗi khi lấy ghi chú:", e);
+    }
+
+    const searchInput = document.getElementById('notes-filter-search');
+    const typeSelect = document.getElementById('notes-filter-type');
+    const docSelect = document.getElementById('notes-filter-doc');
+
+    const searchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const filterType = typeSelect ? typeSelect.value : 'all';
+    const filterDocId = docSelect ? docSelect.value : 'all';
+
+    let filteredNotes = allNotes.filter(note => {
+        if (!isTrackableNote(note)) return false;
+
+        if (searchQuery) {
+            const matchesSelectedText = note.selectedText && note.selectedText.toLowerCase().includes(searchQuery);
+            const matchesNoteText = note.noteText && note.noteText.toLowerCase().includes(searchQuery);
+            const matchesSupplementalText = note.supplementalText && note.supplementalText.toLowerCase().includes(searchQuery);
+            if (!matchesSelectedText && !matchesNoteText && !matchesSupplementalText) return false;
+        }
+
+        if (filterType !== 'all' && note.noteType !== filterType) return false;
+        if (filterDocId !== 'all' && Number(note.docId) !== Number(filterDocId)) return false;
+
+        return true;
+    });
+
+    filteredNotes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    listContainer.innerHTML = '';
+
+    if (filteredNotes.length === 0) {
+        listContainer.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 4rem 0;">
+                <i data-lucide="sticky-note" class="empty-state-icon" style="width: 48px; height: 48px; opacity: 0.5; margin-bottom: 0.75rem;"></i>
+                <h4 style="margin: 0; font-size: 1rem; color: var(--text-main);">Không tìm thấy ghi chú nào</h4>
+                <p style="margin: 0.25rem 0 0; font-size: 0.85rem;">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    filteredNotes.forEach(note => {
+        const doc = state.documents.find(d => d.id === note.docId);
+        const card = document.createElement('div');
+        card.className = 'note-item';
+        card.setAttribute('data-id', note.id);
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.gap = '0.5rem';
+
+        let badge = '';
+        if (note.noteType === 'amended') {
+            badge = '<span class="badge badge-amber" style="width: fit-content;">Sửa đổi</span>';
+        } else if (note.noteType === 'abolished') {
+            badge = '<span class="badge badge-rose" style="width: fit-content;">Bãi bỏ</span>';
+        } else if (note.noteType === 'supplemented') {
+            badge = '<span class="badge badge-green" style="width: fit-content;">Bổ sung</span>';
+        } else if (note.noteType === 'guided') {
+            badge = '<span class="badge badge-blue" style="width: fit-content;">Được hướng dẫn</span>';
+        } else {
+            badge = '<span class="badge badge-gray" style="width: fit-content; background: rgba(255,255,255,0.08); color: var(--text-muted);">Ghi chú thường</span>';
+        }
+
+        const docTitle = doc ? `${doc.number ? doc.number + ' - ' : ''}${doc.title}` : 'Văn bản đã xóa';
+        const dateStr = note.createdAt ? note.createdAt.substring(0, 10) : 'Chưa rõ';
+
+        card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                ${badge}
+                <span style="font-size: 0.75rem; color: var(--text-muted);">${dateStr}</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--primary-color); font-weight: 600; cursor: pointer; text-decoration: underline;" class="note-doc-link" data-doc-id="${note.docId}">
+                <i data-lucide="file-text" style="width: 12px; display: inline-block; vertical-align: middle; margin-right: 2px;"></i> ${escapeHtml(docTitle)}
+            </div>
+            <div class="note-quote">"${escapeHtml(note.selectedText)}"</div>
+            ${note.noteType === 'supplemented' ? `
+                <div style="background: rgba(16, 185, 129, 0.1); border-left: 2px solid #10b981; padding: 0.5rem; margin: 0.25rem 0; font-size: 0.8rem; border-radius: 4px; color: var(--text-main);">
+                    <strong>Đoạn bổ sung:</strong> <span>${escapeHtml(note.supplementalText)}</span>
+                </div>
+            ` : ''}
+            <div class="note-text" style="font-size: 0.85rem; margin-top: 0.25rem;">${linkifyText(note.noteText)}</div>
+            <div class="note-actions" style="margin-top: auto; padding-top: 0.5rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button class="action-btn view-note-doc" title="Xem trong văn bản" style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; padding: 0.3rem 0.6rem; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <i data-lucide="eye" style="width: 14px;"></i> Xem văn bản
+                </button>
+                <button class="action-btn edit-note-global" title="Sửa ghi chú" style="padding: 0.3rem 0.5rem;"><i data-lucide="pencil" style="width: 14px;"></i></button>
+                <button class="action-btn save-note-global" title="Lưu thay đổi" style="display: none; padding: 0.3rem 0.5rem;"><i data-lucide="check" style="width: 14px; color: var(--success-color);"></i></button>
+                <button class="action-btn delete-note-global" title="Xóa ghi chú" style="padding: 0.3rem 0.5rem;"><i data-lucide="trash-2" style="width: 14px; color: var(--danger-color);"></i></button>
+            </div>
+        `;
+
+        const noteTextEl = card.querySelector('.note-text');
+        const editBtn = card.querySelector('.edit-note-global');
+        const saveBtn = card.querySelector('.save-note-global');
+        const deleteBtn = card.querySelector('.delete-note-global');
+        const viewBtn = card.querySelector('.view-note-doc');
+        const docLink = card.querySelector('.note-doc-link');
+
+        const navigateToNote = async () => {
+            if (!doc) return;
+            await openDocumentInViewer(doc.id);
+            setTimeout(() => {
+                jumpToNoteHighlight(note.id);
+            }, 300);
+        };
+
+        viewBtn.addEventListener('click', navigateToNote);
+        docLink.addEventListener('click', navigateToNote);
+
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            noteTextEl.contentEditable = 'true';
+            noteTextEl.textContent = note.noteText || '';
+            noteTextEl.focus();
+            editBtn.style.display = 'none';
+            saveBtn.style.display = '';
+        });
+
+        saveBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const newText = noteTextEl.textContent.trim();
+            await db.updateNote(note.id, newText);
+            note.noteText = newText;
+            alert("Cập nhật ghi chú thành công!");
+            editBtn.style.display = '';
+            saveBtn.style.display = 'none';
+            noteTextEl.contentEditable = 'false';
+            noteTextEl.innerHTML = linkifyText(newText);
+            
+            // Trigger auto-sync
+            if (typeof triggerAutoSync === 'function') {
+                triggerAutoSync();
+            }
+        });
+
+        deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (confirm("Xóa ghi chú này?")) {
+                await db.deleteNote(note.id);
+                populateNotesPageList();
+                updateDashboardStats();
+                
+                // Trigger auto-sync
+                if (typeof triggerAutoSync === 'function') {
+                    triggerAutoSync();
+                }
+            }
+        });
+
+        listContainer.appendChild(card);
+    });
+
+    lucide.createIcons();
 }
 

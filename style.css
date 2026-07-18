@@ -1230,6 +1230,14 @@ body.resizing-sidebar embed {
     transform: translateX(-2px);
 }
 
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+    margin-top: 1.5rem;
+}
+
 .note-quote {
     font-style: italic;
     color: var(--text-muted);

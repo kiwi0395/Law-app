@@ -52,6 +52,9 @@
                         <li class="nav-item" data-target="viewer-page">
                             <a href="#viewer"><i data-lucide="file-text"></i>Nghiên cứu văn bản</a>
                         </li>
+                        <li class="nav-item" data-target="notes-page">
+                            <a href="#notes"><i data-lucide="sticky-note"></i>Tra cứu Ghi chú</a>
+                        </li>
                         <li class="nav-item" data-target="compare-page">
                             <a href="#compare"><i data-lucide="git-compare"></i>Đối soát so sánh</a>
                         </li>
@@ -930,6 +933,37 @@
                             <button class="btn-primary" id="edit-field-modal-save-btn" style="width: auto; padding: 0.5rem 1.25rem;">Lưu thay đổi</button>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <!-- 9. Search/Lookup Notes Page -->
+            <section id="notes-page" class="page-container">
+                <div class="library-filters">
+                    <div class="filter-group">
+                        <label for="notes-filter-search">Tìm kiếm ghi chú</label>
+                        <input type="text" id="notes-filter-search" class="filter-select" placeholder="Tìm theo nội dung bôi đen hoặc ghi chú..." style="min-width: 250px;">
+                    </div>
+                    <div class="filter-group">
+                        <label for="notes-filter-type">Loại ghi chú</label>
+                        <select id="notes-filter-type" class="filter-select">
+                            <option value="all">Tất cả loại</option>
+                            <option value="normal">Ghi chú thường</option>
+                            <option value="amended">Điều khoản Sửa đổi</option>
+                            <option value="abolished">Điều khoản Bãi bỏ</option>
+                            <option value="supplemented">Điều khoản Bổ sung</option>
+                            <option value="guided">Điều khoản được Hướng dẫn</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" style="flex-grow: 1;">
+                        <label for="notes-filter-doc">Thuộc văn bản</label>
+                        <select id="notes-filter-doc" class="filter-select" style="width: 100%; max-width: 400px;">
+                            <option value="all">Tất cả văn bản</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="notes-grid" id="notes-list-container">
+                    <!-- Dynamically populated notes -->
                 </div>
             </section>
         </main>
