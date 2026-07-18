@@ -2341,6 +2341,7 @@ function setupResizeHandle(handle, panel, side, minWidth, maxWidth, storageKey) 
     function onMouseUp() {
         handle.classList.remove('dragging');
         panel.classList.remove('resizing');
+        document.body.classList.remove('resizing-sidebar');
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
         localStorage.setItem(storageKey, Math.round(parseFloat(panel.style.width)));
@@ -2355,6 +2356,7 @@ function setupResizeHandle(handle, panel, side, minWidth, maxWidth, storageKey) 
         startWidth = panel.getBoundingClientRect().width;
         handle.classList.add('dragging');
         panel.classList.add('resizing');
+        document.body.classList.add('resizing-sidebar');
         document.body.style.userSelect = 'none';
         document.body.style.cursor = 'col-resize';
         window.addEventListener('mousemove', onMouseMove);
