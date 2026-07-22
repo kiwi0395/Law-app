@@ -1,5 +1,40 @@
 // LegalDoc Auditor - Database Manager using IndexedDB
 
+function dbBlobToDataUrl(blob) {
+    if (!blob) return Promise.resolve(null);
+    if (typeof blob === 'object' && blob.__blob) return Promise.resolve(blob);
+    if (typeof blob === 'string') return Promise.resolve({ __blob: true, dataUrl: blob });
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve({ __blob: true, dataUrl: reader.result });
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function dbDataUrlToBlob(blobData) {
+    if (!blobData) return null;
+    if (blobData instanceof Blob) return blobData;
+    if (typeof blobData === 'object' && blobData.__blob && blobData.dataUrl) {
+        try {
+            const res = await fetch(blobData.dataUrl);
+            return await res.blob();
+        } catch (e) {
+            console.error("Lỗi giải mã Blob dataUrl:", e);
+            return null;
+        }
+    }
+    if (typeof blobData === 'string' && blobData.startsWith('data:')) {
+        try {
+            const res = await fetch(blobData);
+            return await res.blob();
+        } catch (e) {
+            return null;
+        }
+    }
+    return null;
+}
+
 class LegalDB {
     constructor() {
         this.dbName = 'LegalDocAuditorDB';
@@ -536,13 +571,39 @@ class LegalDB {
 
     // --- Google Drive Sync Helpers ---
 
-    // Xuất toàn bộ dữ liệu thô kèm UUID tham chiếu của các văn bản liên quan
+    // Xuất toàn bộ dữ liệu thô kèm UUID tham chiếu và mã hóa nén Blob cho Cloud
     async getExportData() {
         const docs = await this.getAllDocuments();
         const notes = await this.getAllNotes();
         const rels = await this.getAllRelations();
 
         const docIdToUuidMap = new Map(docs.map(d => [d.id, d.uuid]));
+
+        // Nén các trường Blob (pdfBlob & wordBlob) thành chuỗi Base64 Data URL trước khi đẩy lên Cloud
+        const serializedDocs = await Promise.all(docs.map(async d => {
+            const docCopy = { ...d };
+            if (docCopy.pdfBlob) {
+                try {
+                    docCopy.pdfBlob = (docCopy.pdfBlob instanceof Blob || (typeof docCopy.pdfBlob === 'object' && typeof docCopy.pdfBlob.size === 'number'))
+                        ? await dbBlobToDataUrl(docCopy.pdfBlob)
+                        : docCopy.pdfBlob;
+                } catch (e) {
+                    console.warn(`Không thể nén pdfBlob cho văn bản ${d.id}:`, e);
+                    docCopy.pdfBlob = null;
+                }
+            }
+            if (docCopy.wordBlob) {
+                try {
+                    docCopy.wordBlob = (docCopy.wordBlob instanceof Blob || (typeof docCopy.wordBlob === 'object' && typeof docCopy.wordBlob.size === 'number'))
+                        ? await dbBlobToDataUrl(docCopy.wordBlob)
+                        : docCopy.wordBlob;
+                } catch (e) {
+                    console.warn(`Không thể nén wordBlob cho văn bản ${d.id}:`, e);
+                    docCopy.wordBlob = null;
+                }
+            }
+            return docCopy;
+        }));
 
         // Ánh xạ id số sang uuid chuỗi để đồng bộ chéo thiết bị
         const exportedNotes = notes.map(n => {
@@ -566,7 +627,7 @@ class LegalDB {
         });
 
         return {
-            documents: docs,
+            documents: serializedDocs,
             notes: exportedNotes,
             relations: exportedRels
         };
@@ -598,6 +659,14 @@ class LegalDB {
                 // 1. Trộn documents
                 const remoteDocs = remoteData.documents || [];
                 for (const rDoc of remoteDocs) {
+                    // Giải mã các trường Blob nếu remote gửi ở dạng mã hóa Base64
+                    if (rDoc.pdfBlob) {
+                        rDoc.pdfBlob = await dbDataUrlToBlob(rDoc.pdfBlob);
+                    }
+                    if (rDoc.wordBlob) {
+                        rDoc.wordBlob = await dbDataUrlToBlob(rDoc.wordBlob);
+                    }
+
                     let lDoc = localDocMap.get(rDoc.uuid);
                     // Nếu không khớp UUID, thử tìm theo số hiệu văn bản (ngoại trừ trường hợp "Chưa rõ")
                     if (!lDoc && rDoc.number && rDoc.number !== "Chưa rõ") {
