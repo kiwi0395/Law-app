@@ -1800,6 +1800,45 @@ function closeViewerTab(id) {
     }
 }
 
+let activePdfBlobUrl = null;
+let activeSplitPdfBlobUrl = null;
+
+async function ensurePdfBlob(pdfData) {
+    if (!pdfData) return null;
+
+    try {
+        // 1. Already a valid Blob or File instance
+        if (pdfData instanceof Blob) {
+            if (!pdfData.type || pdfData.type !== 'application/pdf') {
+                return new Blob([pdfData], { type: 'application/pdf' });
+            }
+            return pdfData;
+        }
+
+        // 2. Object format from JSON backup/restore or sync: { __blob: true, dataUrl: "data:..." } or { dataUrl: "data:..." }
+        if (typeof pdfData === 'object' && pdfData.dataUrl) {
+            const res = await fetch(pdfData.dataUrl);
+            const blob = await res.blob();
+            return new Blob([blob], { type: 'application/pdf' });
+        }
+
+        // 3. String format: Data URL
+        if (typeof pdfData === 'string' && pdfData.startsWith('data:')) {
+            const res = await fetch(pdfData);
+            const blob = await res.blob();
+            return new Blob([blob], { type: 'application/pdf' });
+        }
+
+        // 4. ArrayBuffer / TypedArray
+        if (pdfData instanceof ArrayBuffer || ArrayBuffer.isView(pdfData)) {
+            return new Blob([pdfData], { type: 'application/pdf' });
+        }
+    } catch (e) {
+        console.error("Lỗi khi chuẩn hóa dữ liệu PDF Blob:", e);
+    }
+    return null;
+}
+
 async function activateViewerTab(id) {
     const doc = state.openTabs.find(t => t.id === id);
     if (!doc) return;
@@ -1836,22 +1875,42 @@ async function activateViewerTab(id) {
         expiredBanner.style.display = 'none';
     }
 
+    // Clean up previous active PDF URL if any to avoid memory leaks
+    if (activePdfBlobUrl) {
+        try { URL.revokeObjectURL(activePdfBlobUrl); } catch (e) {}
+        activePdfBlobUrl = null;
+    }
+
     // Show PDF or Word parsed content. Any document with an attached PDF opens
     // in the PDF view by default; the toggle to the extracted Word view only
     // appears when that document actually has parsed Word content to show.
-    if (doc.pdfBlob) {
-        const pdfUrl = URL.createObjectURL(doc.pdfBlob);
+    const pdfBlob = await ensurePdfBlob(doc.pdfBlob);
+    if (pdfBlob) {
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        activePdfBlobUrl = pdfUrl;
+
         const toggleBtnHtml = doc.parsedHtml
             ? `<button class="btn-primary" id="toggle-pdf-view-btn" style="width: auto; font-size: 0.8rem; padding: 0.4rem 0.8rem;"><i data-lucide="file-text"></i> Xem định dạng Word trích xuất</button>`
             : '';
+        const openNewTabHtml = `
+            <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="action-btn" style="text-decoration: none; font-size: 0.8rem; padding: 0.4rem 0.8rem; display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 6px;" title="Mở file PDF trong tab mới của trình duyệt">
+                <i data-lucide="external-link" style="width: 14px;"></i> Mở PDF tab mới
+            </a>
+            <a href="${pdfUrl}" download="${escapeHtml(doc.number || doc.title)}.pdf" class="action-btn" style="text-decoration: none; font-size: 0.8rem; padding: 0.4rem 0.8rem; display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 6px;" title="Tải file PDF về máy">
+                <i data-lucide="download" style="width: 14px;"></i> Tải PDF
+            </a>
+        `;
+
         elements.viewerPaperContent.innerHTML = `
-            <div style="height: 800px; width: 100%;">
-                <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+            <div style="height: 800px; width: 100%; display: flex; flex-direction: column;">
+                <div style="margin-bottom: 0.75rem; display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
                     ${toggleBtnHtml}
+                    ${openNewTabHtml}
                 </div>
-                <iframe class="pdf-viewer-frame" src="${pdfUrl}"></iframe>
+                <iframe class="pdf-viewer-frame" src="${pdfUrl}" style="flex: 1; min-height: 0; width: 100%; border: none; border-radius: 8px;"></iframe>
             </div>
         `;
+        lucide.createIcons();
 
         // Handle toggle back
         const toggleBtn = elements.viewerPaperContent.querySelector('#toggle-pdf-view-btn');
@@ -1864,7 +1923,7 @@ async function activateViewerTab(id) {
 
         elements.viewerOutline.innerHTML = doc.parsedHtml
             ? '<li style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center;">Bấm "Xem định dạng Word trích xuất" để xem mục lục điều khoản</li>'
-            : '<li style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center;">Tài liệu này chỉ có bản PDF, không có mục lục điều khoản</li>';
+            : '<li style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center;">Tài liệu này là file PDF. Bạn có thể xem trực tiếp hoặc bấm "Mở PDF tab mới" trên di động.</li>';
     } else if (doc.parsedHtml) {
         const htmlWithHeadings = renderContentAndOutline(doc.parsedHtml);
         elements.viewerPaperContent.innerHTML = htmlWithHeadings;
@@ -3101,9 +3160,52 @@ async function loadSplitDocument(id) {
 
     state.splitDoc = doc;
     const body = document.getElementById('viewer-paper-content-split-body');
-    
+    if (!body) return;
+
+    if (activeSplitPdfBlobUrl) {
+        try { URL.revokeObjectURL(activeSplitPdfBlobUrl); } catch (e) {}
+        activeSplitPdfBlobUrl = null;
+    }
+
     // Clear and set body font size
     body.style.fontSize = `${14 * (state.zoomLevel / 100)}px`;
+
+    const pdfBlob = await ensurePdfBlob(doc.pdfBlob);
+    if (pdfBlob) {
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        activeSplitPdfBlobUrl = pdfUrl;
+
+        const toggleBtnHtml = doc.parsedHtml
+            ? `<button class="btn-primary" id="toggle-split-pdf-view-btn" style="width: auto; font-size: 0.75rem; padding: 0.3rem 0.6rem;"><i data-lucide="file-text" style="width:12px;"></i> Xem Word trích xuất</button>`
+            : '';
+        const openNewTabHtml = `
+            <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="action-btn" style="text-decoration: none; font-size: 0.75rem; padding: 0.3rem 0.6rem; display: inline-flex; align-items: center; gap: 0.3rem; border-radius: 6px;" title="Mở PDF tab mới">
+                <i data-lucide="external-link" style="width:12px;"></i> Mở tab mới
+            </a>
+        `;
+
+        body.innerHTML = `
+            <div style="height: 750px; width: 100%; display: flex; flex-direction: column;">
+                <div style="margin-bottom: 0.5rem; display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+                    ${toggleBtnHtml}
+                    ${openNewTabHtml}
+                </div>
+                <iframe class="pdf-viewer-frame" src="${pdfUrl}" style="flex: 1; min-height: 0; width: 100%; border: none; border-radius: 8px;"></iframe>
+            </div>
+        `;
+        lucide.createIcons();
+
+        const toggleBtn = body.querySelector('#toggle-split-pdf-view-btn');
+        toggleBtn?.addEventListener('click', () => {
+            renderSplitWordContent(doc, body);
+        });
+        return;
+    }
+
+    renderSplitWordContent(doc, body);
+}
+
+async function renderSplitWordContent(doc, body) {
 
     // Parse html content
     const parser = new DOMParser();
@@ -5293,7 +5395,12 @@ function initAIAssistant() {
 
             try {
                 const docText = getActiveDocumentText();
-                if (!docText) throw new Error("Văn bản này không có nội dung để tóm tắt.");
+                if (!docText) {
+                    if (state.currentDoc && state.currentDoc.pdfBlob) {
+                        throw new Error("Tài liệu này là file PDF thô (chưa có bản Word trích xuất). Trợ lý AI cần file Word để tóm tắt và trích dẫn chuyên sâu.");
+                    }
+                    throw new Error("Văn bản này không có nội dung để tóm tắt.");
+                }
 
                 const systemInstruction = "Bạn là một Chuyên gia Pháp luật Việt Nam xuất sắc. Hãy tóm tắt văn bản pháp luật được cung cấp một cách ngắn gọn, rõ ràng bằng tiếng Việt. Sử dụng định dạng markdown đẹp mắt (in đậm, danh sách gạch đầu dòng).";
                 const prompt = `Hãy tóm tắt văn bản pháp luật sau đây. Nêu rõ mục đích ban hành, các điểm mới/quan trọng, đối tượng chịu ảnh hưởng lớn nhất, và thời hiệu thi hành (nếu có).\n\nTên văn bản: ${state.currentDoc.title}\nSố hiệu: ${state.currentDoc.number || 'N/A'}\nNgày ban hành: ${state.currentDoc.issueDate || 'N/A'}\n\nNỘI DUNG VĂN BẢN:\n${docText.substring(0, 150000)}`;
@@ -5338,6 +5445,12 @@ function initAIAssistant() {
 
             try {
                 const docText = getActiveDocumentText();
+                if (!docText) {
+                    if (state.currentDoc && state.currentDoc.pdfBlob) {
+                        throw new Error("Tài liệu này là file PDF thô. Trợ lý AI cần file Word trích xuất để tra cứu và trích dẫn Điều/Khoản.");
+                    }
+                    throw new Error("Văn bản này không có nội dung chữ để trả lời.");
+                }
                 const systemInstruction = `Bạn là một Chuyên gia Pháp luật Việt Nam xuất sắc. Hãy trả lời câu hỏi của người dùng một cách trung thực, chính xác dựa trên nội dung văn bản pháp luật được cung cấp. Luôn trích dẫn rõ Điều/Khoản trong văn bản làm cơ sở pháp lý. Trả lời bằng tiếng Việt, định dạng markdown sạch đẹp.`;
                 const prompt = `NỘI DUNG VĂN BẢN PHÁP LUẬT:\n${docText.substring(0, 150000)}\n\nCÂU HỎI CỦA NGƯỜI DÙNG:\n${question}`;
 
