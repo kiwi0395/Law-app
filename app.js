@@ -1139,7 +1139,7 @@ function setupDocEditHandlers() {
             }
         }
 
-        await db.updateDocument(id, {
+        const updates = {
             title: title,
             number: document.getElementById('doc-edit-number').value.trim(),
             docType: docType,
@@ -1149,7 +1149,31 @@ function setupDocEditHandlers() {
             expiryDate: document.getElementById('doc-edit-expiry-date').value.trim(),
             issuingAuthority: getAuthorityValue('doc-edit-authority-category', 'doc-edit-authority-province', 'doc-edit-authority-custom'),
             sourceUrl: document.getElementById('doc-edit-source-url').value.trim()
-        });
+        };
+
+        // Check if user uploaded replacement Word/PDF files
+        const wordInput = document.getElementById('doc-edit-file-word');
+        const pdfInput = document.getElementById('doc-edit-file-pdf');
+
+        if (wordInput && wordInput.files && wordInput.files[0]) {
+            const wordFile = wordInput.files[0];
+            try {
+                const arrayBuffer = await wordFile.arrayBuffer();
+                const result = await mammoth.convertToHtml({ arrayBuffer });
+                updates.parsedHtml = result.value;
+                updates.wordBlob = wordFile;
+            } catch (err) {
+                console.error("Lỗi khi đọc file Word thay thế:", err);
+                alert("Không thể đọc file Word mới. Vui lòng kiểm tra lại file .docx!");
+                return;
+            }
+        }
+
+        if (pdfInput && pdfInput.files && pdfInput.files[0]) {
+            updates.pdfBlob = pdfInput.files[0];
+        }
+
+        await db.updateDocument(id, updates);
 
         closeModal();
         await reloadData();
@@ -1210,6 +1234,35 @@ async function openDocEditModal(id) {
     document.getElementById('doc-edit-expiry-date').value = doc.expiryDate || '';
     updateAuthorityGroupVisibility('doc-edit-authority-group', doc.docType);
     setAuthorityValue('doc-edit-authority-category', 'doc-edit-authority-province', 'doc-edit-authority-custom', doc.issuingAuthority || '');
+
+    // Reset file input elements and display status of existing files
+    const wordInput = document.getElementById('doc-edit-file-word');
+    const pdfInput = document.getElementById('doc-edit-file-pdf');
+    const wordStatus = document.getElementById('doc-edit-word-status');
+    const pdfStatus = document.getElementById('doc-edit-pdf-status');
+
+    if (wordInput) wordInput.value = '';
+    if (pdfInput) pdfInput.value = '';
+
+    if (wordStatus) {
+        if (doc.wordBlob || doc.parsedHtml) {
+            wordStatus.textContent = '✓ Đã có nội dung Word (Chọn file mới để thay thế)';
+            wordStatus.style.color = '#10b981';
+        } else {
+            wordStatus.textContent = 'Chưa có file Word';
+            wordStatus.style.color = 'var(--text-muted)';
+        }
+    }
+
+    if (pdfStatus) {
+        if (doc.pdfBlob) {
+            pdfStatus.textContent = '✓ Đã có file PDF (Chọn file mới để thay thế)';
+            pdfStatus.style.color = '#10b981';
+        } else {
+            pdfStatus.textContent = 'Chưa có file PDF';
+            pdfStatus.style.color = 'var(--text-muted)';
+        }
+    }
 
     // Populate relations target dropdown and load existing relations
     populateDocEditRelTarget(id);

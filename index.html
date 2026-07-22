@@ -1169,6 +1169,24 @@
                         <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">Ngày hết hiệu lực (để trống nếu còn hiệu lực)</label>
                         <input type="text" id="doc-edit-expiry-date" class="form-input" placeholder="Ví dụ: 31/12/2030" style="height: 36px; font-size: 0.8rem;">
                     </div>
+                    
+                    <!-- File Re-upload Section -->
+                    <div style="border: 1px dashed var(--border-color); padding: 0.65rem; border-radius: 8px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: var(--primary-color); display: flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="upload" style="width: 14px;"></i> Cập nhật / Tải lại tệp nội dung
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                            <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Thay thế tệp Word (.docx):</span>
+                            <input type="file" id="doc-edit-file-word" accept=".docx" class="form-input" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; height: auto;">
+                            <span id="doc-edit-word-status" style="font-size: 0.68rem; color: var(--text-muted); font-style: italic;">Chưa có file</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                            <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Thay thế tệp PDF (.pdf):</span>
+                            <input type="file" id="doc-edit-file-pdf" accept=".pdf" class="form-input" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; height: auto;">
+                            <span id="doc-edit-pdf-status" style="font-size: 0.68rem; color: var(--text-muted); font-style: italic;">Chưa có file</span>
+                        </div>
+                    </div>
+
                     <button class="btn-primary" id="doc-edit-save-btn" style="margin-top: 0.5rem; height: 38px;">
                         <i data-lucide="save" style="width: 16px;"></i> Lưu thay đổi thuộc tính
                     </button>

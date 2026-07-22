@@ -206,6 +206,12 @@ class LegalDB {
                 doc.expiryDate = updates.expiryDate || '';
                 doc.issuingAuthority = updates.issuingAuthority || '';
                 doc.sourceUrl = updates.sourceUrl || '';
+                
+                // Cập nhật tệp mới nếu có
+                if (updates.parsedHtml !== undefined) doc.parsedHtml = updates.parsedHtml;
+                if (updates.wordBlob !== undefined) doc.wordBlob = updates.wordBlob;
+                if (updates.pdfBlob !== undefined) doc.pdfBlob = updates.pdfBlob;
+
                 doc.updatedAt = new Date().toISOString(); // Cập nhật mốc thời gian sửa đổi
 
                 const putRequest = store.put(doc);
