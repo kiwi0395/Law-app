@@ -5455,8 +5455,9 @@ function initAIAssistant() {
                     throw new Error("Văn bản này không có nội dung để tóm tắt.");
                 }
 
-                const systemInstruction = "Bạn là một Chuyên gia Pháp luật Việt Nam xuất sắc. Hãy tóm tắt văn bản pháp luật được cung cấp một cách ngắn gọn, rõ ràng bằng tiếng Việt. Sử dụng định dạng markdown đẹp mắt (in đậm, danh sách gạch đầu dòng).";
-                const prompt = `Hãy tóm tắt văn bản pháp luật sau đây. Nêu rõ mục đích ban hành, các điểm mới/quan trọng, đối tượng chịu ảnh hưởng lớn nhất, và thời hiệu thi hành (nếu có).\n\nTên văn bản: ${state.currentDoc.title}\nSố hiệu: ${state.currentDoc.number || 'N/A'}\nNgày ban hành: ${state.currentDoc.issueDate || 'N/A'}\n\nNỘI DUNG VĂN BẢN:\n${docText.substring(0, 150000)}`;
+                const systemInstruction = "Bạn là một Chuyên gia Pháp luật Việt Nam xuất sắc. Hãy tóm tắt văn bản pháp luật được cung cấp một cách ngắn gọn, rõ ràng bằng tiếng Việt. Sử dụng định dạng markdown đẹp mắt (in đậm, danh sách gạch đầu dòng). Nếu có phần ghi chú sửa đổi/bổ sung do người dùng đánh dấu, hãy phản ánh các thay đổi đó trong bản tóm tắt và nêu rõ điều khoản nào đã bị sửa đổi/bãi bỏ/bổ sung.";
+                const annotations = getActiveDocumentAnnotations();
+                const prompt = `Hãy tóm tắt văn bản pháp luật sau đây. Nêu rõ mục đích ban hành, các điểm mới/quan trọng, đối tượng chịu ảnh hưởng lớn nhất, và thời hiệu thi hành (nếu có).\n\nTên văn bản: ${state.currentDoc.title}\nSố hiệu: ${state.currentDoc.number || 'N/A'}\nNgày ban hành: ${state.currentDoc.issueDate || 'N/A'}\n\nNỘI DUNG VĂN BẢN:\n${docText.substring(0, 150000)}${annotations}`;
 
                 const responseText = await callGeminiAPI(prompt, systemInstruction);
                 appendChatMessage('ai', responseText);
@@ -5504,8 +5505,9 @@ function initAIAssistant() {
                     }
                     throw new Error("Văn bản này không có nội dung chữ để trả lời.");
                 }
-                const systemInstruction = `Bạn là một Chuyên gia Pháp luật Việt Nam xuất sắc. Hãy trả lời câu hỏi của người dùng một cách trung thực, chính xác dựa trên nội dung văn bản pháp luật được cung cấp. Luôn trích dẫn rõ Điều/Khoản trong văn bản làm cơ sở pháp lý. Trả lời bằng tiếng Việt, định dạng markdown sạch đẹp.`;
-                const prompt = `NỘI DUNG VĂN BẢN PHÁP LUẬT:\n${docText.substring(0, 150000)}\n\nCÂU HỎI CỦA NGƯỜI DÙNG:\n${question}`;
+                const systemInstruction = `Bạn là một Chuyên gia Pháp luật Việt Nam xuất sắc. Hãy trả lời câu hỏi của người dùng một cách trung thực, chính xác dựa trên nội dung văn bản pháp luật được cung cấp. Luôn trích dẫn rõ Điều/Khoản trong văn bản làm cơ sở pháp lý. Nếu văn bản có phần ghi chú sửa đổi/bổ sung do người dùng đánh dấu, hãy ưu tiên xem đó là thông tin cập nhật và nêu rõ điều khoản đã thay đổi khi trả lời. Trả lời bằng tiếng Việt, định dạng markdown sạch đẹp.`;
+                const annotations = getActiveDocumentAnnotations();
+                const prompt = `NỘI DUNG VĂN BẢN PHÁP LUẬT:\n${docText.substring(0, 150000)}${annotations}\n\nCÂU HỎI CỦA NGƯỜI DÙNG:\n${question}`;
 
                 const responseText = await callGeminiAPI(prompt, systemInstruction);
                 
@@ -5663,6 +5665,41 @@ function getActiveDocumentText() {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = state.currentDoc.parsedHtml;
     return tempDiv.textContent || tempDiv.innerText || '';
+}
+
+// Gom các ghi chú người dùng đã đánh dấu trên văn bản (sửa đổi/bãi bỏ/bổ
+// sung/được hướng dẫn/ghi chú thường) thành 1 khối văn bản, để đính kèm vào
+// ngữ cảnh gửi cho AI — nhờ đó AI "thấy" được các thay đổi người dùng ghi
+// nhận, chứ không chỉ đọc nội dung gốc của văn bản.
+function getActiveDocumentAnnotations() {
+    if (!state.currentDoc || !Array.isArray(state.currentNotes)) return '';
+    const notes = state.currentNotes.filter(isTrackableNote);
+    if (notes.length === 0) return '';
+
+    const typeLabel = {
+        amended: 'SỬA ĐỔI',
+        abolished: 'BÃI BỎ',
+        supplemented: 'BỔ SUNG',
+        guided: 'ĐƯỢC HƯỚNG DẪN',
+        normal: 'GHI CHÚ'
+    };
+
+    const lines = notes.map((note, i) => {
+        const label = typeLabel[note.noteType] || 'GHI CHÚ';
+        let s = `${i + 1}. [${label}] Tại đoạn: "${note.selectedText}"`;
+        if (note.noteText) s += `\n   - Ghi chú của người dùng: ${note.noteText}`;
+        if (note.noteType === 'supplemented' && note.supplementalText) {
+            s += `\n   - Nội dung bổ sung: ${note.supplementalText}`;
+        }
+        const refDoc = note.refDocId ? state.documents.find(d => d.id === Number(note.refDocId)) : null;
+        if (refDoc) {
+            s += `\n   - Văn bản dẫn chiếu: ${refDoc.number || refDoc.title}`;
+            if (refDoc.effectiveDate) s += ` (hiệu lực từ ngày ${refDoc.effectiveDate})`;
+        }
+        return s;
+    });
+
+    return `\n\n=== GHI CHÚ SỬA ĐỔI / BỔ SUNG DO NGƯỜI DÙNG ĐÁNH DẤU TRÊN VĂN BẢN NÀY ===\n(Đây là những thay đổi/ghi chú người dùng đã đánh dấu trực tiếp lên các điều khoản. Khi phân tích hoặc trả lời, hãy coi đây là thông tin cập nhật quan trọng và phản ánh các thay đổi này.)\n\n${lines.join('\n\n')}`;
 }
 
 function appendChatMessage(role, text) {
