@@ -443,38 +443,21 @@ async function dataUrlToBlob(dataUrl) {
 }
 
 async function exportBackup() {
-    const [documents, notes, relations] = await Promise.all([
-        db.getAllDocuments(), db.getAllNotes(), db.getAllRelations()
-    ]);
-
-    // Serialize any attached blobs into base64 data URLs safely
-    for (const d of documents) {
-        try {
-            d.pdfBlob = (d.pdfBlob && (d.pdfBlob instanceof Blob || (typeof d.pdfBlob === 'object' && typeof d.pdfBlob.size === 'number'))) 
-                ? { __blob: true, dataUrl: await blobToDataUrl(d.pdfBlob) } 
-                : null;
-        } catch (err) {
-            console.warn(`Không thể chuyển đổi pdfBlob cho tài liệu ${d.id}:`, err);
-            d.pdfBlob = null;
-        }
-
-        try {
-            d.wordBlob = (d.wordBlob && (d.wordBlob instanceof Blob || (typeof d.wordBlob === 'object' && typeof d.wordBlob.size === 'number'))) 
-                ? { __blob: true, dataUrl: await blobToDataUrl(d.wordBlob) } 
-                : null;
-        } catch (err) {
-            console.warn(`Không thể chuyển đổi wordBlob cho tài liệu ${d.id}:`, err);
-            d.wordBlob = null;
-        }
-    }
+    const exportData = await db.getExportData();
 
     const payload = {
         app: 'LegalDocAuditor',
         formatVersion: 1,
         exportedAt: new Date().toISOString(),
-        counts: { documents: documents.length, notes: notes.length, relations: relations.length },
-        documents, notes, relations,
-        fieldHierarchy: FIELD_HIERARCHY
+        counts: {
+            documents: exportData.documents.length,
+            notes: exportData.notes.length,
+            relations: exportData.relations.length
+        },
+        documents: exportData.documents,
+        notes: exportData.notes,
+        relations: exportData.relations,
+        fieldHierarchy: typeof FIELD_HIERARCHY !== 'undefined' ? FIELD_HIERARCHY : null
     };
 
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
@@ -487,9 +470,9 @@ async function exportBackup() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
 
-    alert(`Đã xuất sao lưu:\n- ${documents.length} văn bản\n- ${notes.length} ghi chú\n- ${relations.length} quan hệ\n\nHãy cất file này vào OneDrive/USB để an toàn.`);
+    alert(`Đã xuất sao lưu thành công:\n- ${exportData.documents.length} văn bản\n- ${exportData.notes.length} ghi chú\n- ${exportData.relations.length} quan hệ\n\nHãy cất file này vào nơi an toàn.`);
 }
 
 async function importBackup(file) {
@@ -562,9 +545,14 @@ function setupBackupHandlers() {
 
     exportBtn.addEventListener('click', async () => {
         exportBtn.disabled = true;
-        try { await exportBackup(); }
-        catch (e) { console.error(e); alert("Có lỗi khi xuất sao lưu."); }
-        finally { exportBtn.disabled = false; }
+        try {
+            await exportBackup();
+        } catch (e) {
+            console.error("Lỗi xuất sao lưu:", e);
+            alert("Có lỗi khi xuất sao lưu:\n" + (e.message || e));
+        } finally {
+            exportBtn.disabled = false;
+        }
     });
 
     importBtn.addEventListener('click', () => importInput.click());

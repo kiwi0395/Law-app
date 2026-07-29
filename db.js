@@ -641,32 +641,49 @@ class LegalDB {
                     throw new Error("Dữ liệu đồng bộ không hợp lệ");
                 }
 
-                const localDocs = await this.getAllDocuments();
-                const localNotes = await this.getAllNotes();
-                const localRels = await this.getAllRelations();
-
-                const localDocMap = new Map(localDocs.map(d => [d.uuid, d]));
-                const localNoteMap = new Map(localNotes.map(n => [n.uuid, n]));
-                const localRelMap = new Map(localRels.map(r => [r.uuid, r]));
-
-                const tx = this.db.transaction(['documents', 'notes', 'relations'], 'readwrite');
-                const ds = tx.objectStore('documents');
-                const ns = tx.objectStore('notes');
-                const rs = tx.objectStore('relations');
-
-                const docUuidToLocalIdMap = new Map();
-
-                // 1. Trộn documents
+                // 1. Chuyển đổi tất cả các Blob từ DataURL ra ngoài transaction
                 const remoteDocs = remoteData.documents || [];
                 for (const rDoc of remoteDocs) {
-                    // Giải mã các trường Blob nếu remote gửi ở dạng mã hóa Base64
                     if (rDoc.pdfBlob) {
                         rDoc.pdfBlob = await dbDataUrlToBlob(rDoc.pdfBlob);
                     }
                     if (rDoc.wordBlob) {
                         rDoc.wordBlob = await dbDataUrlToBlob(rDoc.wordBlob);
                     }
+                }
 
+                // 2. Lấy toàn bộ dữ liệu cục bộ ra ngoài transaction
+                const localDocs = await this.getAllDocuments();
+                const localNotes = await this.getAllNotes();
+                const localRels = await this.getAllRelations();
+
+                // Tính toán max ID hiện tại để gán id mới đồng bộ
+                let maxDocId = 0;
+                localDocs.forEach(d => { if (typeof d.id === 'number' && d.id > maxDocId) maxDocId = d.id; });
+
+                let maxNoteId = 0;
+                localNotes.forEach(n => { if (typeof n.id === 'number' && n.id > maxNoteId) maxNoteId = n.id; });
+
+                let maxRelId = 0;
+                localRels.forEach(r => { if (typeof r.id === 'number' && r.id > maxRelId) maxRelId = r.id; });
+
+                const localDocMap = new Map(localDocs.map(d => [d.uuid, d]));
+                const localNoteMap = new Map(localNotes.map(n => [n.uuid, n]));
+                const localRelMap = new Map(localRels.map(r => [r.uuid, r]));
+
+                // 3. Mở transaction và thực hiện put hoàn toàn ĐỒNG BỘ (không await trong transaction)
+                const tx = this.db.transaction(['documents', 'notes', 'relations'], 'readwrite');
+                const ds = tx.objectStore('documents');
+                const ns = tx.objectStore('notes');
+                const rs = tx.objectStore('relations');
+
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = (e) => reject(e.target.error);
+
+                const docUuidToLocalIdMap = new Map();
+
+                // Trộn documents
+                for (const rDoc of remoteDocs) {
                     let lDoc = localDocMap.get(rDoc.uuid);
                     // Nếu không khớp UUID, thử tìm theo số hiệu văn bản (ngoại trừ trường hợp "Chưa rõ")
                     if (!lDoc && rDoc.number && rDoc.number !== "Chưa rõ") {
@@ -684,18 +701,10 @@ class LegalDB {
                         }
                         docUuidToLocalIdMap.set(rDoc.uuid, lDoc.id);
                     } else {
-                        // Thêm mới văn bản
-                        const incomingDoc = { ...rDoc };
-                        delete incomingDoc.id; // tự sinh ID mới
-                        
-                        const request = ds.put(incomingDoc);
-                        await new Promise((res, rej) => {
-                            request.onsuccess = (e) => {
-                                docUuidToLocalIdMap.set(rDoc.uuid, e.target.result);
-                                res();
-                            };
-                            request.onerror = rej;
-                        });
+                        maxDocId++;
+                        const incomingDoc = { ...rDoc, id: maxDocId };
+                        ds.put(incomingDoc);
+                        docUuidToLocalIdMap.set(rDoc.uuid, maxDocId);
                     }
                 }
 
@@ -706,7 +715,7 @@ class LegalDB {
                     }
                 }
 
-                // 2. Trộn notes
+                // Trộn notes
                 const remoteNotes = remoteData.notes || [];
                 for (const rNote of remoteNotes) {
                     const localDocId = docUuidToLocalIdMap.get(rNote.docUuid);
@@ -727,13 +736,13 @@ class LegalDB {
                             ns.put(rNote);
                         }
                     } else {
-                        const incomingNote = { ...rNote };
-                        delete incomingNote.id;
+                        maxNoteId++;
+                        const incomingNote = { ...rNote, id: maxNoteId };
                         ns.put(incomingNote);
                     }
                 }
 
-                // 3. Trộn relations
+                // Trộn relations
                 const remoteRels = remoteData.relations || [];
                 for (const rRel of remoteRels) {
                     const localSourceId = docUuidToLocalIdMap.get(rRel.sourceDocUuid);
@@ -753,14 +762,11 @@ class LegalDB {
                             rs.put(rRel);
                         }
                     } else {
-                        const incomingRel = { ...rRel };
-                        delete incomingRel.id;
+                        maxRelId++;
+                        const incomingRel = { ...rRel, id: maxRelId };
                         rs.put(incomingRel);
                     }
                 }
-
-                tx.oncomplete = () => resolve(true);
-                tx.onerror = (e) => reject(e.target.error);
 
             } catch (err) {
                 reject(err);
